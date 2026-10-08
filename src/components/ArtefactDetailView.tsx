@@ -54,7 +54,6 @@ import { isTextBasedArtefact } from "../services/googleDocsService";
 import {
   extractFigmaFileKey,
   readFigjamBoardViaMcp,
-  setDefaultFigjamBoard,
   getDefaultFigjamBoard,
   pingFigjamMcpServer,
 } from "../services/figjamMcpService";
@@ -209,7 +208,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
 
     setIsConnectingBoard(true);
     try {
-      setDefaultFigjamBoard(key);
       setLocalConnectedKey(key);
       setBoardUrlInput(fileUrl);
       setIsEditingBoardUrl(false);

@@ -67,13 +67,15 @@ export function extractFigmaFileKey(input?: string): string | null {
   return null;
 }
 
+// The FigJam file of the open project. Every visual artefact in a project draws into this file.
+let activeProjectFigjamKey = "";
+
 export function getDefaultFigjamBoard(): string {
-  return localStorage.getItem("kickstart_default_figjam_board") || "";
+  return activeProjectFigjamKey;
 }
 
-export function setDefaultFigjamBoard(keyOrUrl: string) {
-  const key = extractFigmaFileKey(keyOrUrl) || keyOrUrl.trim();
-  localStorage.setItem("kickstart_default_figjam_board", key);
+export function setActiveProjectFigjamBoard(keyOrUrl: string) {
+  activeProjectFigjamKey = extractFigmaFileKey(keyOrUrl) || keyOrUrl.trim();
 }
 
 export function getFigmaToken(): string {

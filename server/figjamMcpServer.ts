@@ -1669,6 +1669,20 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
             return;
           }
 
+          // Each project owns one FigJam file, so never fall back to drawing into a different open file
+          const clientFileKey = client.fileInfo?.fileKey || null;
+          if (requestedKey && clientFileKey && clientFileKey !== requestedKey) {
+            res.status(409).json({
+              jsonrpc: "2.0",
+              id,
+              error: {
+                code: -32003,
+                message: `This project draws into its own FigJam file, but the Desktop Bridge is running in "${client.fileInfo?.fileName || clientFileKey}". Open https://www.figma.com/board/${requestedKey} in Figma Desktop, run Plugins > Development > Figma Desktop Bridge there, then generate again.`,
+              },
+            });
+            return;
+          }
+
           let drawResult: any;
           try {
             drawResult = await executeInFigjam(client, pluginCode, 30000);
