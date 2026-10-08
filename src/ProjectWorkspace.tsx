@@ -42,6 +42,7 @@ import {
   generateFigjamArtefactViaMcp,
   checkFigjamBridgeStatus,
   getDefaultFigjamBoard,
+  figmaFileUrl,
 } from "./services/figjamMcpService";
 import { Project, ProjectCanvasSaver } from "./services/projectsService";
 import { apiFetch } from "./services/authService";
@@ -426,7 +427,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       const bridge = await checkFigjamBridgeStatus();
       if (!bridge.figjamReady) {
         showNotification(
-          "FigJam is not connected. In Figma Desktop, open a FigJam file and run Plugins > Development > Figma Desktop Bridge."
+          "Figma is not connected. In Figma Desktop, open the project's FigJam or Figma Design file and run Plugins > Development > Figma Desktop Bridge."
         );
         return;
       }
@@ -458,7 +459,9 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       return;
     }
 
-    const fileUrl = `https://www.figma.com/board/${effectiveFileKey}`;
+    // The project link already has the right editor path; any other file uses /file/, which redirects
+    const fileUrl =
+      effectiveFileKey === project.figjamFileKey ? project.figjamFileUrl : figmaFileUrl(effectiveFileKey);
     const embedUrl = `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(
       fileUrl
     )}`;
@@ -486,7 +489,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         figjamCreatedAt: new Date().toISOString(),
         error: null,
       });
-      showNotification("FigJam board connected & displayed inline! Connect inputs on canvas to generate specifications.");
+      showNotification("Figma file connected & displayed inline! Connect inputs on canvas to generate specifications.");
       return;
     }
 
@@ -545,7 +548,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       const bridge = await checkFigjamBridgeStatus();
       if (!bridge.figjamReady) {
         const message =
-          "FigJam is not connected. In Figma Desktop, open a FigJam file and run Plugins > Development > Figma Desktop Bridge, then click Generate again.";
+          "Figma is not connected. In Figma Desktop, open the project's FigJam or Figma Design file and run Plugins > Development > Figma Desktop Bridge, then click Generate again.";
         showNotification(message);
         handleUpdateNode(nodeId, { isGenerating: false, error: message });
         setActiveDetailNodeId(nodeId);
@@ -617,7 +620,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       let figjamError: string | null = null;
       if (isVisualFigjamArtefact(targetNode.type)) {
         try {
-          showNotification(`Drawing ${targetNode.title} in FigJam...`);
+          showNotification(`Drawing ${targetNode.title} in Figma...`);
           // Draw into the FigJam file the Desktop Bridge plugin is open in, unless a file was chosen explicitly
           const figjamResult = await generateFigjamArtefactViaMcp({
             title: targetNode.title,
@@ -627,7 +630,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           });
           if (figjamResult.fileId) {
             figjamFileId = figjamResult.fileId;
-            figjamFileUrl = figjamResult.fileUrl || `https://www.figma.com/board/${figjamResult.fileId}`;
+            figjamFileUrl = figjamResult.fileUrl || figmaFileUrl(figjamResult.fileId);
             figjamEmbedUrl = figjamResult.embedUrl || `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(figjamFileUrl)}`;
             figjamCreatedAt = new Date().toISOString();
           }
@@ -803,9 +806,9 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
             target="_blank"
             rel="noreferrer"
             className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
-            title="Open this project's FigJam file"
+            title="Open this project's Figma file"
           >
-            Project FigJam file
+            Project Figma file
           </a>
 
           <button

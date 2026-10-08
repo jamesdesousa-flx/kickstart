@@ -47,7 +47,7 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
   }, []);
 
   const handleDelete = async (project: ProjectSummary) => {
-    if (!window.confirm(`Delete "${project.name}"? Its canvas will be lost. The FigJam file is not changed.`)) {
+    if (!window.confirm(`Delete "${project.name}"? Its canvas will be lost. The Figma file is not changed.`)) {
       return;
     }
     try {
@@ -106,7 +106,7 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
             <FolderOpen className="w-8 h-8 text-slate-400 mx-auto mb-3" />
             <p className="text-sm font-medium text-slate-700">No projects yet</p>
             <p className="text-xs text-slate-500 mt-1 mb-4">
-              A project holds one canvas and draws into a FigJam file.
+              A project holds one canvas and draws into a FigJam or Figma Design file.
             </p>
             <button
               onClick={() => setIsCreateOpen(true)}
@@ -136,7 +136,7 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
                     href={project.figjamFileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    title="Open FigJam file"
+                    title="Open Figma file"
                     className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -212,11 +212,11 @@ const NewProjectModal: React.FC<{
           className="w-full px-3 py-2 mb-4 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 select-text"
         />
 
-        <label className="block text-xs font-medium text-slate-700 mb-1">FigJam file link</label>
+        <label className="block text-xs font-medium text-slate-700 mb-1">FigJam or Figma Design file link</label>
         <input
           value={figjamUrl}
           onChange={(e) => setFigjamUrl(e.target.value)}
-          placeholder="https://www.figma.com/board/..."
+          placeholder="https://www.figma.com/board/... or https://www.figma.com/design/..."
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 select-text"
         />
         <p className="text-[11px] text-slate-500 mt-1.5 mb-4 leading-relaxed">
@@ -224,6 +224,10 @@ const NewProjectModal: React.FC<{
           file. No file yet?{" "}
           <a href="https://figjam.new" target="_blank" rel="noreferrer" className="underline text-slate-700">
             Create one in FigJam
+          </a>{" "}
+          or{" "}
+          <a href="https://figma.new" target="_blank" rel="noreferrer" className="underline text-slate-700">
+            Figma Design
           </a>
           , then copy its link (Share &gt; Copy link).
         </p>

@@ -68,7 +68,33 @@ export function extractFigmaFileKey(input?: string): string | null {
   return null;
 }
 
-// The FigJam file of the open project. Every visual artefact in a project draws into this file.
+/**
+ * Builds a file link. FigJam opens at /board/, Figma Design at /design/, and /file/ redirects to either.
+ */
+export function figmaFileUrl(fileKey: string, editorType?: string | null): string {
+  const path = editorType === "figjam" ? "board" : editorType === "figma" ? "design" : "file";
+  return `https://www.figma.com/${path}/${fileKey}`;
+}
+
+/**
+ * Reads the editor from a pasted link: /board/ is FigJam, /design/ is Figma Design, anything else is unknown
+ */
+export function figmaEditorTypeFromUrl(input?: string): "figjam" | "figma" | null {
+  if (!input) return null;
+  if (/figma\.com\/board\//i.test(input)) return "figjam";
+  if (/figma\.com\/design\//i.test(input)) return "figma";
+  return null;
+}
+
+/**
+ * Normalises a pasted link or key into a clean file link of the right editor type
+ */
+export function figmaFileUrlFromInput(input?: string): string | null {
+  const key = extractFigmaFileKey(input);
+  return key ? figmaFileUrl(key, figmaEditorTypeFromUrl(input)) : null;
+}
+
+// The Figma file (FigJam or Design) of the open project. Every visual artefact in a project draws into this file.
 let activeProjectFigjamKey = "";
 
 export function getDefaultFigjamBoard(): string {
@@ -206,7 +232,7 @@ export async function writeFigjamArtefactViaMcp(params: {
   });
 
   const fileKey = result?.fileKey || null;
-  const fileUrl = result?.fileUrl || (fileKey ? `https://www.figma.com/board/${fileKey}` : null);
+  const fileUrl = result?.fileUrl || (fileKey ? figmaFileUrl(fileKey, result?.editorType) : null);
   const embedUrl =
     result?.embedUrl ||
     (fileUrl ? `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(fileUrl)}` : null);
@@ -293,6 +319,8 @@ export async function checkFigjamBridgeStatus(fileKey?: string): Promise<{
   figjamReady: boolean;
   figjamFileName: string | null;
   figjamFileKey: string | null;
+  /** "figjam" or "figma" (Design) for the connected file */
+  figjamEditorType: string | null;
   port: number | null;
   error?: string;
 }> {
@@ -304,6 +332,7 @@ export async function checkFigjamBridgeStatus(fileKey?: string): Promise<{
       figjamReady: !!res?.figjamReady,
       figjamFileName: res?.figjamFileName || null,
       figjamFileKey: res?.figjamFileKey || null,
+      figjamEditorType: res?.figjamEditorType || null,
       port: res?.port || 9223,
     };
   } catch (err) {
@@ -314,6 +343,7 @@ export async function checkFigjamBridgeStatus(fileKey?: string): Promise<{
       figjamReady: false,
       figjamFileName: null,
       figjamFileKey: null,
+      figjamEditorType: null,
       port: 9223,
       error: (err as Error)?.message,
     };

@@ -190,20 +190,31 @@ export function initDesktopBridgeServer(port = BRIDGE_PORT_START) {
 
 initDesktopBridgeServer();
 
+/** Editors the drawing code supports: FigJam boards and Figma Design files */
+export const DRAWABLE_EDITOR_TYPES = ["figjam", "figma"];
+
 /**
- * Picks the connected bridge client running inside a FigJam file.
+ * Builds a file link. FigJam opens at /board/, Figma Design at /design/, and /file/ redirects to either.
+ */
+export function figmaFileUrl(fileKey: string, editorType?: string | null): string {
+  const path = editorType === "figjam" ? "board" : editorType === "figma" ? "design" : "file";
+  return `https://www.figma.com/${path}/${fileKey}`;
+}
+
+/**
+ * Picks the connected bridge client running inside a FigJam or Figma Design file.
  * Prefers the file matching `fileKey` when one is given, then the most recently opened file.
  */
 export function findFigjamBridgeClient(fileKey?: string | null): BridgeClient | null {
   const open = [...bridgeClients.values()].filter((c) => c.ws.readyState === WebSocket.OPEN);
-  const figjam = open
-    .filter((c) => c.fileInfo?.editorType === "figjam")
+  const drawable = open
+    .filter((c) => DRAWABLE_EDITOR_TYPES.includes(c.fileInfo?.editorType || ""))
     .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
   if (fileKey) {
-    const match = figjam.find((c) => c.fileInfo?.fileKey === fileKey);
+    const match = drawable.find((c) => c.fileInfo?.fileKey === fileKey);
     if (match) return match;
   }
-  return figjam[0] || null;
+  return drawable[0] || null;
 }
 
 export function listBridgeClients() {
@@ -831,6 +842,8 @@ export function generateFigjamCanvasElements(
  * The bridge wraps the code in an async function, so it is a function body that ends in `return`.
  * The artefact is drawn on a new page named after it (or to the right of existing content if the
  * file refuses a new page), inside one section, with real shapes, stickies and connectors.
+ * Figma Design files have no stickies, shapes with text or connectors, so there they are drawn
+ * as frames with text and arrow vectors. Those arrows do not follow the shapes when moved.
  */
 export function generateFigjamPluginCode(payload: FigjamCanvasPayload): string {
   const spec = {
@@ -844,8 +857,9 @@ export function generateFigjamPluginCode(payload: FigjamCanvasPayload): string {
   };
 
   return `
-if (figma.editorType !== "figjam") {
-  throw new Error("The Desktop Bridge plugin is open in a " + figma.editorType + " file. Open it in a FigJam file.");
+const isJam = figma.editorType === "figjam";
+if (!isJam && figma.editorType !== "figma") {
+  throw new Error("The Desktop Bridge plugin is open in a " + figma.editorType + " file. Open it in a FigJam or Figma Design file.");
 }
 const spec = ${JSON.stringify(spec)};
 
@@ -943,6 +957,126 @@ const drawWireElement = async (el) => {
   return n;
 };
 
+// Figma Design stand-in for a FigJam shape with text: an outline shape with centred text in a frame
+const makeDesignShape = async (s) => {
+  const frame = figma.createFrame();
+  frame.name = (s.text || "Shape").slice(0, 60);
+  frame.resize(s.width, s.height);
+  frame.fills = [];
+  frame.clipsContent = false;
+  let body;
+  if (s.shapeType === "ELLIPSE") {
+    body = figma.createEllipse();
+  } else if (s.shapeType === "DIAMOND") {
+    body = figma.createPolygon();
+    body.pointCount = 4;
+  } else {
+    body = figma.createRectangle();
+    if (s.shapeType === "ROUNDED_RECTANGLE") body.cornerRadius = 16;
+  }
+  body.resize(s.width, s.height);
+  body.fills = [{ type: "SOLID", color: hex(s.fillColor) }];
+  body.strokes = [{ type: "SOLID", color: hex(s.strokeColor) }];
+  body.strokeWeight = 2;
+  frame.appendChild(body);
+  body.x = 0;
+  body.y = 0;
+  // A diamond's usable middle is half its width
+  const inset = s.shapeType === "DIAMOND" ? s.width / 4 : 12;
+  const t = await makeText(s.text, { w: s.width - inset * 2, size: 14, weight: "Medium", align: "CENTER" });
+  frame.appendChild(t);
+  t.x = inset;
+  t.y = Math.max(0, (s.height - t.height) / 2);
+  return frame;
+};
+
+// Figma Design stand-in for a FigJam sticky: a coloured auto layout frame that grows with its text
+const makeDesignSticky = async (s) => {
+  const width = s.width > 240 ? 416 : 240;
+  const frame = figma.createFrame();
+  frame.name = "Sticky";
+  frame.layoutMode = "VERTICAL";
+  frame.primaryAxisSizingMode = "AUTO";
+  frame.counterAxisSizingMode = "FIXED";
+  frame.paddingLeft = frame.paddingRight = frame.paddingTop = frame.paddingBottom = 16;
+  frame.resize(width, 240);
+  frame.minHeight = 240;
+  frame.fills = [{ type: "SOLID", color: hex(STICKY_COLORS[s.color] || STICKY_COLORS.YELLOW) }];
+  frame.effects = [{
+    type: "DROP_SHADOW", color: { r: 0, g: 0, b: 0, a: 0.12 }, offset: { x: 0, y: 2 },
+    radius: 6, spread: 0, visible: true, blendMode: "NORMAL",
+  }];
+  const t = await makeText(s.text, { w: width - 32, size: 16, color: "#1E1E1E" });
+  frame.appendChild(t);
+  t.layoutSizingHorizontal = "FILL";
+  return frame;
+};
+
+// Figma Design stand-in for a connector: an arrow vector between the two nodes' edges, plus a label
+const makeDesignArrow = async (from, to, c) => {
+  const box = (n) => ({ x: n.x, y: n.y, w: n.width, h: n.height, cx: n.x + n.width / 2, cy: n.y + n.height / 2 });
+  const a = box(from);
+  const b = box(to);
+  let pts;
+  if (c.loop) {
+    // Back edges run under the row, like the FigJam BOTTOM magnets
+    const drop = Math.max(a.y + a.h, b.y + b.h) + 60;
+    pts = [{ x: a.cx, y: a.y + a.h }, { x: a.cx, y: drop }, { x: b.cx, y: drop }, { x: b.cx, y: b.y + b.h }];
+  } else {
+    const dx = b.cx - a.cx;
+    const dy = b.cy - a.cy;
+    if (!dx && !dy) return [];
+    // Where the line from the centre leaves the node's bounding box
+    const edge = (r, ux, uy) => {
+      const t = Math.min(ux ? r.w / 2 / Math.abs(ux) : Infinity, uy ? r.h / 2 / Math.abs(uy) : Infinity);
+      return { x: r.cx + ux * t, y: r.cy + uy * t };
+    };
+    pts = [edge(a, dx, dy), edge(b, -dx, -dy)];
+  }
+  const left = Math.min(...pts.map((p) => p.x));
+  const top = Math.min(...pts.map((p) => p.y));
+  const network = {
+    vertices: pts.map((p, i) => ({
+      x: p.x - left,
+      y: p.y - top,
+      strokeCap: i === pts.length - 1 ? "ARROW_LINES" : "NONE",
+    })),
+    segments: pts.slice(1).map((p, i) => ({ start: i, end: i + 1 })),
+  };
+  const arrow = figma.createVector();
+  arrow.name = "Connector";
+  if (arrow.setVectorNetworkAsync) await arrow.setVectorNetworkAsync(network);
+  else arrow.vectorNetwork = network;
+  arrow.x = left;
+  arrow.y = top;
+  arrow.fills = [];
+  arrow.strokes = [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.45 } }];
+  arrow.strokeWeight = 2;
+  const nodes = [arrow];
+  if (c.text) {
+    // Label sits on a white chip at the middle of the middle segment
+    const mid = Math.floor((pts.length - 1) / 2);
+    const mx = (pts[mid].x + pts[mid + 1].x) / 2;
+    const my = (pts[mid].y + pts[mid + 1].y) / 2;
+    const chip = figma.createFrame();
+    chip.name = "Connector label";
+    chip.layoutMode = "HORIZONTAL";
+    chip.primaryAxisSizingMode = "AUTO";
+    chip.counterAxisSizingMode = "AUTO";
+    chip.paddingLeft = chip.paddingRight = 6;
+    chip.paddingTop = chip.paddingBottom = 2;
+    chip.cornerRadius = 4;
+    chip.fills = [{ type: "SOLID", color: hex("#FFFFFF") }];
+    const t = await makeText(c.text, { w: 140, size: 12, color: "#475569", align: "CENTER" });
+    t.textAutoResize = "WIDTH_AND_HEIGHT";
+    chip.appendChild(t);
+    chip.x = mx - chip.width / 2;
+    chip.y = my - chip.height / 2;
+    nodes.push(chip);
+  }
+  return nodes;
+};
+
 // Each artefact gets its own page; fall back to free space on the current page
 const startPage = figma.currentPage;
 let page = startPage;
@@ -1013,27 +1147,39 @@ for (const l of spec.labels) {
 }
 
 for (const s of spec.shapes) {
-  const node = figma.createShapeWithText();
-  made.push(node);
-  node.shapeType = s.shapeType === "RECTANGLE" ? "SQUARE" : s.shapeType;
-  node.resize(s.width, s.height);
+  let node;
+  if (isJam) {
+    node = figma.createShapeWithText();
+    made.push(node);
+    node.shapeType = s.shapeType === "RECTANGLE" ? "SQUARE" : s.shapeType;
+    node.resize(s.width, s.height);
+    node.fills = [{ type: "SOLID", color: hex(s.fillColor) }];
+    node.strokes = [{ type: "SOLID", color: hex(s.strokeColor) }];
+    await setText(node.text, s.text);
+  } else {
+    node = await makeDesignShape(s);
+    made.push(node);
+  }
   node.x = s.x + offsetX;
   node.y = s.y;
-  node.fills = [{ type: "SOLID", color: hex(s.fillColor) }];
-  node.strokes = [{ type: "SOLID", color: hex(s.strokeColor) }];
-  await setText(node.text, s.text);
   byId[s.id] = node;
   placed.push(node);
 }
 
 for (const s of spec.stickies) {
-  const sticky = figma.createSticky();
-  made.push(sticky);
-  await setText(sticky.text, s.text);
+  let sticky;
+  if (isJam) {
+    sticky = figma.createSticky();
+    made.push(sticky);
+    await setText(sticky.text, s.text);
+    try { sticky.fills = [{ type: "SOLID", color: hex(STICKY_COLORS[s.color] || STICKY_COLORS.YELLOW) }]; } catch (e) {}
+    if (s.width > 240) { try { sticky.isWideWidth = true; } catch (e) {} }
+  } else {
+    sticky = await makeDesignSticky(s);
+    made.push(sticky);
+  }
   sticky.x = s.x + offsetX;
   sticky.y = s.y;
-  try { sticky.fills = [{ type: "SOLID", color: hex(STICKY_COLORS[s.color] || STICKY_COLORS.YELLOW) }]; } catch (e) {}
-  if (s.width > 240) { try { sticky.isWideWidth = true; } catch (e) {} }
   byId[s.id] = sticky;
   placed.push(sticky);
 }
@@ -1051,6 +1197,13 @@ for (const c of spec.connectors) {
   const from = byId[c.fromId];
   const to = byId[c.toId];
   if (!from || !to) continue;
+  if (!isJam) {
+    const nodes = await makeDesignArrow(from, to, c);
+    made.push(...nodes);
+    placed.push(...nodes);
+    if (nodes.length) connectorCount++;
+    continue;
+  }
   const conn = figma.createConnector();
   made.push(conn);
   conn.connectorStart = { endpointNodeId: from.id, magnet: c.loop ? "BOTTOM" : "AUTO" };
@@ -1093,6 +1246,7 @@ figma.viewport.scrollAndZoomIntoView([section]);
 return {
   fileKey: figma.fileKey || null,
   fileName: figma.root.name,
+  editorType: figma.editorType,
   pageId: page.id,
   pageName: page.name,
   newPage,
@@ -1539,6 +1693,7 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
               figjamReady: !!figjamClient,
               figjamFileName: figjamClient?.fileInfo?.fileName || null,
               figjamFileKey: figjamClient?.fileInfo?.fileKey || null,
+              figjamEditorType: figjamClient?.fileInfo?.editorType || null,
               clients: listBridgeClients(),
               port: bridgePortActive,
               protocol: "ws-jsonrpc",
@@ -1606,7 +1761,7 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
             }
           }
 
-          const fileUrl = `https://www.figma.com/board/${fileKey}`;
+          const fileUrl = figmaFileUrl(fileKey, fileData?.editorType);
           const embedUrl = `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(
             fileUrl
           )}`;
@@ -1626,7 +1781,8 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
               fileKey,
               fileUrl,
               embedUrl,
-              fileName: fileData?.name || `FigJam Board (${fileKey})`,
+              fileName: fileData?.name || `Figma file (${fileKey})`,
+              editorType: fileData?.editorType || null,
               lastModified: fileData?.lastModified || new Date().toISOString(),
               stickies: stickiesFound,
               frames: framesFound,
@@ -1675,7 +1831,9 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
           // OAuth from Figma-approved clients, so the Desktop Bridge plugin is the write path.
           const client = findFigjamBridgeClient(requestedKey);
           if (!client) {
-            const otherEditors = listBridgeClients().filter((c) => c.editorType && c.editorType !== "figjam");
+            const otherEditors = listBridgeClients().filter(
+              (c) => c.editorType && !DRAWABLE_EDITOR_TYPES.includes(c.editorType)
+            );
             res.status(409).json({
               jsonrpc: "2.0",
               id,
@@ -1683,14 +1841,14 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
                 code: -32001,
                 message:
                   otherEditors.length > 0
-                    ? `The Figma Desktop Bridge plugin is open in "${otherEditors[0].fileName}", which is not a FigJam file. Open a FigJam file in Figma Desktop and run the Desktop Bridge plugin there.`
-                    : "No FigJam file is connected. Open a FigJam file in Figma Desktop and run Plugins > Development > Figma Desktop Bridge, then generate again.",
+                    ? `The Figma Desktop Bridge plugin is open in "${otherEditors[0].fileName}", which is not a FigJam or Figma Design file. Open the project's file in Figma Desktop and run the Desktop Bridge plugin there.`
+                    : "No Figma file is connected. Open the project's FigJam or Figma Design file in Figma Desktop and run Plugins > Development > Figma Desktop Bridge, then generate again.",
               },
             });
             return;
           }
 
-          // Each project owns one FigJam file, so never fall back to drawing into a different open file
+          // Each project owns one Figma file, so never fall back to drawing into a different open file
           const clientFileKey = client.fileInfo?.fileKey || null;
           if (requestedKey && clientFileKey && clientFileKey !== requestedKey) {
             res.status(409).json({
@@ -1698,7 +1856,7 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
               id,
               error: {
                 code: -32003,
-                message: `This project draws into a different FigJam file, but the Desktop Bridge is running in "${client.fileInfo?.fileName || clientFileKey}". Open https://www.figma.com/board/${requestedKey} in Figma Desktop, run Plugins > Development > Figma Desktop Bridge there, then generate again.`,
+                message: `This project draws into a different Figma file, but the Desktop Bridge is running in "${client.fileInfo?.fileName || clientFileKey}". Open ${figmaFileUrl(requestedKey)} in Figma Desktop, run Plugins > Development > Figma Desktop Bridge there, then generate again.`,
               },
             });
             return;
@@ -1713,7 +1871,7 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
               id,
               error: {
                 code: -32002,
-                message: `FigJam could not draw "${title}": ${err?.message || "unknown plugin error"}`,
+                message: `Figma could not draw "${title}": ${err?.message || "unknown plugin error"}`,
               },
             });
             return;
@@ -1723,11 +1881,12 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
           const nodeParam = drawResult?.sectionId
             ? `?node-id=${encodeURIComponent(String(drawResult.sectionId).replace(":", "-"))}`
             : "";
-          const fileUrl = fileKey ? `https://www.figma.com/board/${fileKey}${nodeParam}` : null;
+          const editorType = drawResult?.editorType || client.fileInfo?.editorType || null;
+          const fileUrl = fileKey ? `${figmaFileUrl(fileKey, editorType)}${nodeParam}` : null;
           const embedUrl = fileUrl
             ? `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(fileUrl)}`
             : null;
-          const fileName = drawResult?.fileName || client.fileInfo?.fileName || "FigJam file";
+          const fileName = drawResult?.fileName || client.fileInfo?.fileName || "Figma file";
           const where = drawResult?.newPage
             ? `on new page "${drawResult.pageName}" in "${fileName}"`
             : `in "${fileName}"`;
@@ -1746,6 +1905,7 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
               fileUrl,
               embedUrl,
               fileName,
+              editorType,
               pageName: drawResult?.pageName || null,
               sectionId: drawResult?.sectionId || null,
               title,

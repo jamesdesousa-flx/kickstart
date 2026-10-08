@@ -4,7 +4,7 @@
  */
 
 import { supabase } from "./supabaseClient";
-import { extractFigmaFileKey } from "./figjamMcpService";
+import { extractFigmaFileKey, figmaFileUrlFromInput } from "./figjamMcpService";
 import { CanvasEdge, CanvasNode } from "../types/artefacts";
 
 export interface Project {
@@ -69,8 +69,10 @@ export async function createProject(params: { name: string; figjamUrl: string })
   if (!name) throw new Error("Give the project a name.");
 
   const figjamFileKey = extractFigmaFileKey(params.figjamUrl);
-  if (!figjamFileKey || !/figma\.com\/board\//i.test(params.figjamUrl)) {
-    throw new Error("Paste a FigJam file link, like https://www.figma.com/board/abc123/My-Board.");
+  if (!figjamFileKey || !/figma\.com\/(board|design|file)\//i.test(params.figjamUrl)) {
+    throw new Error(
+      "Paste a FigJam or Figma Design file link, like https://www.figma.com/board/abc123/My-Board or https://www.figma.com/design/abc123/My-File."
+    );
   }
 
   const { data, error } = await supabase
@@ -78,7 +80,7 @@ export async function createProject(params: { name: string; figjamUrl: string })
     .insert({
       name,
       figjam_file_key: figjamFileKey,
-      figjam_file_url: `https://www.figma.com/board/${figjamFileKey}`,
+      figjam_file_url: figmaFileUrlFromInput(params.figjamUrl)!,
     })
     .select(PROJECT_COLUMNS)
     .single();

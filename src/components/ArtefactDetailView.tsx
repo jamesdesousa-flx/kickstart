@@ -56,6 +56,8 @@ import {
   readFigjamBoardViaMcp,
   getDefaultFigjamBoard,
   pingFigjamMcpServer,
+  figmaFileUrl,
+  figmaFileUrlFromInput,
 } from "../services/figjamMcpService";
 
 interface UpstreamSourceInfo {
@@ -191,17 +193,17 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
     setConnectError(null);
     const raw = (urlOrKey || boardUrlInput).trim();
     if (!raw) {
-      setConnectError("Please paste a FigJam board URL or file key.");
+      setConnectError("Please paste a FigJam or Figma Design file URL, or a file key.");
       return;
     }
     const key = extractFigmaFileKey(raw);
     if (!key) {
       setConnectError(
-        "Could not detect a FigJam board key. Please paste a URL like https://www.figma.com/board/... or enter your file key."
+        "Could not detect a Figma file key. Please paste a URL like https://www.figma.com/board/... or https://www.figma.com/design/..., or enter your file key."
       );
       return;
     }
-    const fileUrl = `https://www.figma.com/board/${key}`;
+    const fileUrl = figmaFileUrlFromInput(raw) || figmaFileUrl(key);
     const embedUrl = `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(
       fileUrl
     )}`;
@@ -242,7 +244,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
       const readRes = await readFigjamBoardViaMcp(node.figjamFileId);
       setReadSummary(readRes.summaryText);
     } catch (err: any) {
-      setReadSummary(`Error reading FigJam board: ${err?.message || "Failed"}`);
+      setReadSummary(`Error reading Figma file: ${err?.message || "Failed"}`);
     } finally {
       setIsReadingBoard(false);
     }
@@ -558,7 +560,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 truncate">
-                        Interactive FigJam file displayed inline via Model Context Protocol
+                        Interactive Figma file displayed inline via Model Context Protocol
                       </p>
                     </div>
                   </div>
@@ -568,21 +570,21 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                     <a
                       href={
                         node.figjamFileUrl ||
-                        `https://www.figma.com/board/${activeFigjamKey}`
+                        figmaFileUrl(activeFigjamKey)
                       }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-1.5 text-xs font-semibold text-[#7B61FF] hover:text-[#684FF2] bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
-                      title="Open board in FigJam tab"
+                      title="Open file in a Figma tab"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open in FigJam</span>
+                      <span>Open in Figma</span>
                     </a>
 
                     <button
                       onClick={() => setIsEditingBoardUrl(!isEditingBoardUrl)}
                       className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Change connected FigJam Board"
+                      title="Change connected Figma file"
                     >
                       Change Board
                     </button>
@@ -596,7 +598,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       type="text"
                       value={boardUrlInput}
                       onChange={(e) => setBoardUrlInput(e.target.value)}
-                      placeholder="Paste new FigJam board URL (https://www.figma.com/board/...)"
+                      placeholder="Paste new FigJam or Figma Design URL (https://www.figma.com/board/... or /design/...)"
                       className="flex-1 text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
                     />
                     <button
@@ -622,7 +624,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       node.figjamEmbedUrl ||
                       `https://www.figma.com/embed?embed_host=astra&url=${encodeURIComponent(
                         node.figjamFileUrl ||
-                          `https://www.figma.com/board/${activeFigjamKey}`
+                          figmaFileUrl(activeFigjamKey)
                       )}`
                     }
                     className="w-full flex-1 border-0 bg-white"
@@ -632,12 +634,12 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                   />
                   <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
                     <span>
-                      Live FigJam board integration • Read & write via Model Context Protocol
+                      Live Figma file integration • Read & write via Model Context Protocol
                     </span>
                     <a
                       href={
                         node.figjamFileUrl ||
-                        `https://www.figma.com/board/${activeFigjamKey}`
+                        figmaFileUrl(activeFigjamKey)
                       }
                       target="_blank"
                       rel="noopener noreferrer"
@@ -672,7 +674,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      Figma is not connected. For visual artefacts (<strong>{badgeInfo.label}</strong>), nothing is generated outside of FigJam. Check your MCP connection or link a FigJam board below to generate and display this artefact inline.
+                      Figma is not connected. For visual artefacts (<strong>{badgeInfo.label}</strong>), nothing is generated outside of Figma. Check your MCP connection or link a FigJam or Figma Design file below to generate and display this artefact inline.
                     </p>
                   </div>
                 </div>
@@ -743,7 +745,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                     </a>
                   </div>
                   <p className="text-[11px] text-slate-500">
-                    Open a FigJam board (or create one at <code>figjam.new</code>), copy the link from your browser address bar, and paste it below.
+                    Open a FigJam board or Figma Design file (or create one at <code>figjam.new</code> or <code>figma.new</code>), copy the link from your browser address bar, and paste it below.
                   </p>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
@@ -754,7 +756,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                         setBoardUrlInput(e.target.value);
                         if (connectError) setConnectError(null);
                       }}
-                      placeholder="Paste FigJam URL (e.g. https://www.figma.com/board/...)"
+                      placeholder="Paste Figma URL (e.g. https://www.figma.com/board/... or /design/...)"
                       className="flex-1 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]"
                     />
                     <button

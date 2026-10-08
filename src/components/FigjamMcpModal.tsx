@@ -8,6 +8,7 @@ import { X, CheckCircle2, AlertCircle, RefreshCw, ExternalLink } from "lucide-re
 import {
   checkFigjamBridgeStatus,
   getDefaultFigjamBoard,
+  figmaFileUrl,
 } from "../services/figjamMcpService";
 
 interface FigjamMcpModalProps {
@@ -18,7 +19,7 @@ interface FigjamMcpModalProps {
 interface ConnectionStatus {
   ok: boolean;
   message: string;
-  /** The FigJam file the bridge is running in, when there is one */
+  /** The FigJam or Figma Design file the bridge is running in, when there is one */
   fileUrl?: string;
   fileName?: string;
 }
@@ -36,8 +37,8 @@ export const FigjamMcpModal: React.FC<FigjamMcpModalProps> = ({
     const bridge = await checkFigjamBridgeStatus(linkedFileKey);
     const file = bridge.figjamFileKey
       ? {
-          fileUrl: `https://www.figma.com/board/${bridge.figjamFileKey}`,
-          fileName: bridge.figjamFileName || "Open FigJam file",
+          fileUrl: figmaFileUrl(bridge.figjamFileKey, bridge.figjamEditorType),
+          fileName: bridge.figjamFileName || "Open Figma file",
         }
       : {};
 
@@ -46,11 +47,11 @@ export const FigjamMcpModal: React.FC<FigjamMcpModalProps> = ({
     } else if (!bridge.figjamReady) {
       setStatus({ ok: false, message: "MCP connection off" });
     } else if (!linkedFileKey) {
-      setStatus({ ok: false, message: "This project has no linked FigJam file", ...file });
+      setStatus({ ok: false, message: "This project has no linked Figma file", ...file });
     } else if (bridge.figjamFileKey !== linkedFileKey) {
-      setStatus({ ok: false, message: "Connected to the wrong FigJam file", ...file });
+      setStatus({ ok: false, message: "Connected to the wrong Figma file", ...file });
     } else {
-      setStatus({ ok: true, message: "Connected to the linked FigJam file", ...file });
+      setStatus({ ok: true, message: "Connected to the linked Figma file", ...file });
     }
     setIsChecking(false);
   };
@@ -66,7 +67,7 @@ export const FigjamMcpModal: React.FC<FigjamMcpModalProps> = ({
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div className="p-4 sm:px-6 border-b border-slate-200 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900">
-            FigJam MCP Connection
+            Figma MCP Connection
           </h3>
           <div className="flex items-center gap-1">
             <button
