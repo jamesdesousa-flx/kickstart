@@ -121,5 +121,3 @@ npx wrangler deploy
 ```
 
 Note: this deploys the frontend only. The Express API in `server.ts` (artefact generation, roadmap, FigJam) does not run on Cloudflare with this config. It must be hosted separately.
-
-Pushes to `main` deploy automatically through Cloudflare Workers Builds.
