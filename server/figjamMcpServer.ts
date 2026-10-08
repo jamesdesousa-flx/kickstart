@@ -234,6 +234,26 @@ function sendBridgeRequest(
 }
 
 /**
+ * Asks each open bridge client which file it is in, because the FILE_INFO message sent on connect can be missed.
+ */
+export async function refreshBridgeFileInfo(timeoutMs = 3000): Promise<void> {
+  const open = [...bridgeClients.values()].filter((c) => c.ws.readyState === WebSocket.OPEN);
+  await Promise.all(
+    open.map(async (client) => {
+      try {
+        const reply = await sendBridgeRequest(client, "GET_FILE_INFO", {}, timeoutMs);
+        const info = reply?.fileInfo || reply;
+        if (info?.editorType) {
+          client.fileInfo = info;
+        }
+      } catch {
+        // Keep the last known file info
+      }
+    })
+  );
+}
+
+/**
  * Runs Plugin API code inside the bridge client's open file and returns the code's return value.
  */
 export async function executeInFigjam(client: BridgeClient, code: string, timeoutMs = 30000): Promise<any> {
@@ -1508,7 +1528,8 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
 
         // TOOL: BRIDGE STATUS
         if (name === "figjam_get_bridge_status") {
-          const figjamClient = findFigjamBridgeClient();
+          await refreshBridgeFileInfo();
+          const figjamClient = findFigjamBridgeClient(extractFigmaFileKey(args.fileKey || "") || null);
           res.json({
             jsonrpc: "2.0",
             id,
@@ -1677,7 +1698,7 @@ export async function handleFigjamMcpRequest(req: Request, res: Response) {
               id,
               error: {
                 code: -32003,
-                message: `This project draws into its own FigJam file, but the Desktop Bridge is running in "${client.fileInfo?.fileName || clientFileKey}". Open https://www.figma.com/board/${requestedKey} in Figma Desktop, run Plugins > Development > Figma Desktop Bridge there, then generate again.`,
+                message: `This project draws into a different FigJam file, but the Desktop Bridge is running in "${client.fileInfo?.fileName || clientFileKey}". Open https://www.figma.com/board/${requestedKey} in Figma Desktop, run Plugins > Development > Figma Desktop Bridge there, then generate again.`,
               },
             });
             return;

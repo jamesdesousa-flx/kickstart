@@ -82,12 +82,7 @@ export async function createProject(params: { name: string; figjamUrl: string })
     })
     .select(PROJECT_COLUMNS)
     .single();
-  if (error) {
-    if (error.code === "23505") {
-      throw new Error("Another project already uses this FigJam file. Each project needs its own file.");
-    }
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
   return toProject(data);
 }
 

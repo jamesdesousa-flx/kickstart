@@ -896,7 +896,6 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         <FigjamMcpModal
           isOpen={isFigjamModalOpen}
           onClose={() => setIsFigjamModalOpen(false)}
-          onNotification={showNotification}
         />
 
         {/* Floating Notification Toast */}

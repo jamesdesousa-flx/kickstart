@@ -106,7 +106,7 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
             <FolderOpen className="w-8 h-8 text-slate-400 mx-auto mb-3" />
             <p className="text-sm font-medium text-slate-700">No projects yet</p>
             <p className="text-xs text-slate-500 mt-1 mb-4">
-              A project holds one canvas and draws into its own FigJam file.
+              A project holds one canvas and draws into a FigJam file.
             </p>
             <button
               onClick={() => setIsCreateOpen(true)}
@@ -220,7 +220,7 @@ const NewProjectModal: React.FC<{
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 select-text"
         />
         <p className="text-[11px] text-slate-500 mt-1.5 mb-4 leading-relaxed">
-          Wireframes, flows and journey maps for this project are drawn into this file. Each project needs its own
+          Wireframes, flows and journey maps for this project are drawn into this file. Projects can share a
           file. No file yet?{" "}
           <a href="https://figjam.new" target="_blank" rel="noreferrer" className="underline text-slate-700">
             Create one in FigJam

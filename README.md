@@ -98,6 +98,7 @@ The schema lives in `supabase/migrations/`:
 
 - `0001_projects.sql` creates `projects`, `project_nodes` (canvas blocks) and `project_edges` (connections).
 - `0002_fluxon_only_auth.sql` limits sign-in and data access to `@fluxon.com` accounts.
+- `0003_shared_figjam_files.sql` lets more than one project use the same FigJam file.
 
 Access is enforced in three places: the browser (`src/services/allowedDomain.ts`), the API (`server/requireFluxonUser.ts`) and the database (row level security and a sign-up trigger).
 

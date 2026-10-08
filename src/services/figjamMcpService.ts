@@ -129,8 +129,11 @@ export async function callFigjamMcpTool(
     const data = await response.json();
 
     if (!response.ok || data.error) {
+      // JSON-RPC errors are objects; the auth middleware sends a plain string
       const errMsg =
-        data.error?.message || `HTTP ${response.status} from FigJam MCP Server`;
+        data.error?.message ||
+        (typeof data.error === "string" ? data.error : "") ||
+        `HTTP ${response.status} from FigJam MCP Server`;
       recordMcpLog({
         id: reqId,
         timestamp: new Date().toISOString(),
@@ -284,24 +287,36 @@ export async function generateFigjamArtefactViaMcp(params: {
 /**
  * Checks Desktop Bridge connection status
  */
-export async function checkFigjamBridgeStatus(): Promise<{
+export async function checkFigjamBridgeStatus(fileKey?: string): Promise<{
   connected: boolean;
   connectedClients: number;
   figjamReady: boolean;
   figjamFileName: string | null;
+  figjamFileKey: string | null;
   port: number | null;
+  error?: string;
 }> {
   try {
-    const res = await callFigjamMcpTool("figjam_get_bridge_status", {});
+    const res = await callFigjamMcpTool("figjam_get_bridge_status", fileKey ? { fileKey } : {});
     return {
       connected: !!res?.connected,
       connectedClients: res?.connectedClients || 0,
       figjamReady: !!res?.figjamReady,
       figjamFileName: res?.figjamFileName || null,
+      figjamFileKey: res?.figjamFileKey || null,
       port: res?.port || 9223,
     };
-  } catch {
-    return { connected: false, connectedClients: 0, figjamReady: false, figjamFileName: null, port: 9223 };
+  } catch (err) {
+    console.warn("[FigJam MCP] Bridge status check failed:", err);
+    return {
+      connected: false,
+      connectedClients: 0,
+      figjamReady: false,
+      figjamFileName: null,
+      figjamFileKey: null,
+      port: 9223,
+      error: (err as Error)?.message,
+    };
   }
 }
 
