@@ -1,0 +1,8 @@
+{
+  "name": "Kickstart - Design artefact generation",
+  "description": "Node-based canvas to connect context, upload documentation, and generate UX research and product design artefacts including interview scripts, personas, user flows, journey maps, wireframes, and surveys.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
