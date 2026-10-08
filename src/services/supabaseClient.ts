@@ -14,4 +14,7 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  // PKCE returns the sign-in result as ?code=..., which keeps it out of the #/projects/<id> hash route
+  auth: { flowType: "pkce" },
+});

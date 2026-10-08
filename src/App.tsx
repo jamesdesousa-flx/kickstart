@@ -10,6 +10,14 @@ import { Project, getProject, loadProjectCanvas } from "./services/projectsServi
 import { setActiveProjectFigjamBoard } from "./services/figjamMcpService";
 import { ProjectsHome } from "./components/ProjectsHome";
 import { ProjectWorkspace } from "./ProjectWorkspace";
+import { SignInScreen } from "./components/SignInScreen";
+import {
+  ALLOWED_EMAIL_DOMAIN,
+  getSession,
+  isAllowedEmail,
+  onSessionChange,
+  signOut,
+} from "./services/authService";
 
 type OpenProject = {
   project: Project;
@@ -22,7 +30,42 @@ function projectIdFromHash(): string | null {
   return match ? match[1] : null;
 }
 
+/** Shows the sign-in screen until someone with an allowed Google account is signed in */
 export default function App() {
+  // undefined while the stored session is still being read
+  const [userEmail, setUserEmail] = useState<string | null | undefined>(undefined);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const applySession = (email: string | null) => {
+      if (email && !isAllowedEmail(email)) {
+        setAuthError(`${email} is not allowed. Sign in with your @${ALLOWED_EMAIL_DOMAIN} account.`);
+        setUserEmail(null);
+        signOut();
+        return;
+      }
+      setUserEmail(email);
+    };
+    getSession()
+      .then((session) => applySession(session?.user.email ?? null))
+      .catch(() => applySession(null));
+    return onSessionChange((session) => applySession(session?.user.email ?? null));
+  }, []);
+
+  if (userEmail === undefined) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-slate-50 text-slate-600">
+        <Loader2 className="w-5 h-5 animate-spin" />
+      </div>
+    );
+  }
+  if (!userEmail) {
+    return <SignInScreen error={authError} />;
+  }
+  return <SignedInApp userEmail={userEmail} />;
+}
+
+function SignedInApp({ userEmail }: { userEmail: string }) {
   const [routeProjectId, setRouteProjectId] = useState<string | null>(projectIdFromHash);
   const [openProject, setOpenProject] = useState<OpenProject | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -66,7 +109,11 @@ export default function App() {
   }, []);
 
   if (!routeProjectId) {
-    return <ProjectsHome onOpenProject={(project) => navigateTo(project.id)} />;
+    return <ProjectsHome
+        userEmail={userEmail}
+        onSignOut={signOut}
+        onOpenProject={(project) => navigateTo(project.id)}
+      />;
   }
 
   if (!openProject) {

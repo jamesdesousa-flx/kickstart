@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { Plus, FolderOpen, Trash2, X, ExternalLink, Loader2, AlertCircle } from "lucide-react";
+import { Plus, FolderOpen, Trash2, X, ExternalLink, Loader2, AlertCircle, LogOut } from "lucide-react";
 import {
   Project,
   ProjectSummary,
@@ -14,6 +14,8 @@ import {
 } from "../services/projectsService";
 
 interface ProjectsHomeProps {
+  userEmail: string;
+  onSignOut: () => void;
   onOpenProject: (project: Project) => void;
 }
 
@@ -26,7 +28,7 @@ function formatUpdated(iso: string): string {
   return `Edited ${date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ onOpenProject }) => {
+export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut, onOpenProject }) => {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -60,6 +62,14 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ onOpenProject }) => 
     <div className="min-h-screen w-screen bg-slate-50 font-sans text-slate-900">
       <header className="h-12 px-4 bg-white border-b border-slate-200 flex items-center">
         <span className="text-sm font-semibold tracking-tight text-slate-900">Kickstart</span>
+        <span className="ml-auto text-xs text-slate-500 truncate">{userEmail}</span>
+        <button
+          onClick={onSignOut}
+          className="ml-3 px-2 py-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md flex items-center gap-1 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Sign out
+        </button>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">

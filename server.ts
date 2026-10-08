@@ -10,6 +10,7 @@ import {
   handleFigjamMcpRequest,
   FIGJAM_MCP_TOOLS,
 } from "./server/figjamMcpServer.ts";
+import { requireFluxonUser } from "./server/requireFluxonUser.ts";
 
 dotenv.config();
 
@@ -638,6 +639,7 @@ const roadmapSchema = {
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: "25mb" }));
+  app.use("/api", requireFluxonUser);
 
   // FigJam MCP Server Endpoints (Model Context Protocol JSON-RPC 2.0)
   app.post("/api/mcp/figjam", handleFigjamMcpRequest);

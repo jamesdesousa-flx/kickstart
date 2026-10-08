@@ -4,6 +4,7 @@
  */
 
 import { ArtefactType, FigjamMcpToolCallLog } from "../types/artefacts";
+import { apiFetch } from "./authService";
 
 // In-memory MCP call log for the UI inspector
 const mcpLogs: FigjamMcpToolCallLog[] = [];
@@ -118,7 +119,7 @@ export async function callFigjamMcpTool(
   };
 
   try {
-    const response = await fetch("/api/mcp/figjam", {
+    const response = await apiFetch("/api/mcp/figjam", {
       method: "POST",
       headers,
       body: JSON.stringify(mcpPayload),
@@ -314,7 +315,7 @@ export async function pingFigjamMcpServer(): Promise<{
 }> {
   const start = performance.now();
   try {
-    const res = await fetch("/api/mcp/figjam/status");
+    const res = await apiFetch("/api/mcp/figjam/status");
     const data = await res.json();
     const latencyMs = Math.round(performance.now() - start);
     return {

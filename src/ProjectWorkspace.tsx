@@ -44,6 +44,7 @@ import {
   getDefaultFigjamBoard,
 } from "./services/figjamMcpService";
 import { Project, ProjectCanvasSaver } from "./services/projectsService";
+import { apiFetch } from "./services/authService";
 import {
   CanvasNode,
   CanvasEdge,
@@ -560,7 +561,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
     });
 
     try {
-      const response = await fetch("/api/artefact/generate", {
+      const response = await apiFetch("/api/artefact/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
