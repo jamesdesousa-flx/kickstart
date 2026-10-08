@@ -26,9 +26,7 @@ import {
   ARTEFACT_LIBRARY_ITEMS,
   ArtefactLibraryItem,
   ArtefactType,
-  isVisualFigjamArtefact,
 } from "../types/artefacts";
-import { isTextBasedArtefact } from "../services/googleDocsService";
 
 interface ArtefactLibraryPanelProps {
   isOpen: boolean;
@@ -173,45 +171,46 @@ export const ArtefactLibraryPanel: React.FC<ArtefactLibraryPanelProps> = ({
 
       {/* Artefacts List */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-        {filteredItems.map((item) => (
-          <div
-            key={item.type}
-            draggable
-            onDragStart={(e) => handleDragStart(e, item)}
-            onClick={() => onAddArtefact(item.type)}
-            className="group relative bg-white border border-slate-200 hover:border-slate-400 rounded-lg p-2.5 shadow-2xs hover:shadow-xs transition-all cursor-grab active:cursor-grabbing select-none"
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
-                  {getItemIcon(item.type)}
+        {(selectedCategory === "All"
+          ? (["Input", "Output"] as const).map((cat) => ({
+              title: `${cat}s`,
+              items: filteredItems.filter((item) => item.category === cat),
+            }))
+          : [{ title: null, items: filteredItems }]
+        )
+          .filter((group) => group.items.length > 0)
+          .map((group) => (
+            <div key={group.title ?? "items"} className="space-y-2">
+              {group.title && (
+                <h4 className="px-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  {group.title}
+                </h4>
+              )}
+              {group.items.map((item) => (
+                <div
+                  key={item.type}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item)}
+                  onClick={() => onAddArtefact(item.type)}
+                  className="group relative bg-white border border-slate-200 hover:border-slate-400 rounded-lg p-2.5 shadow-2xs hover:shadow-xs transition-all cursor-grab active:cursor-grabbing select-none"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                        {getItemIcon(item.type)}
+                      </div>
+                      <h3 className="text-xs font-semibold text-slate-900 group-hover:text-slate-950 transition-colors">
+                        {item.name}
+                      </h3>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {item.badge}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-xs font-semibold text-slate-900 group-hover:text-slate-950 transition-colors">
-                  {item.name}
-                </h3>
-              </div>
-              <div className="flex items-center gap-1">
-                {isVisualFigjamArtefact(item.type) && (
-                  <span className="text-[9px] font-semibold text-[#7B61FF] bg-purple-50 border border-purple-200/80 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
-                    FigJam
-                  </span>
-                )}
-                {isTextBasedArtefact(item.type) && (
-                  <span className="text-[9px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
-                    Doc
-                  </span>
-                )}
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {item.badge}
-                </span>
-              </div>
+              ))}
             </div>
-
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              {item.description}
-            </p>
-          </div>
-        ))}
+          ))}
 
         {filteredItems.length === 0 && (
           <div className="py-8 text-center text-slate-400 text-xs">
