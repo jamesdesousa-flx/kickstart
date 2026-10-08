@@ -27,8 +27,8 @@ import {
   ArrowLeft,
   CloudOff,
 } from "lucide-react";
-import { User } from "firebase/auth";
 import {
+  GoogleUser,
   initAuth,
   googleSignIn,
   getAccessToken,
@@ -76,7 +76,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
   const [notification, setNotification] = useState<string | null>(null);
 
   // Google Workspace Authentication State
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isSigningInGoogle, setIsSigningInGoogle] = useState<boolean>(false);
   const [isCreatingGoogleDoc, setIsCreatingGoogleDoc] = useState<boolean>(false);

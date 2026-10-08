@@ -6,6 +6,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 import { ALLOWED_EMAIL_DOMAIN } from "./allowedDomain";
+import { GOOGLE_WORKSPACE_SCOPES } from "./googleAuth";
 
 export { ALLOWED_EMAIL_DOMAIN, isAllowedEmail } from "./allowedDomain";
 
@@ -14,6 +15,8 @@ export async function signInWithGoogle(): Promise<void> {
     provider: "google",
     options: {
       redirectTo: window.location.origin,
+      // Ask for Drive and Docs access now, so users do not have to connect Google separately
+      scopes: GOOGLE_WORKSPACE_SCOPES.join(" "),
       // `hd` makes Google's account picker show only accounts on this domain
       queryParams: { hd: ALLOWED_EMAIL_DOMAIN, prompt: "select_account" },
     },

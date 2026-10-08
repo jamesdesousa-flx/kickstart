@@ -49,7 +49,7 @@ import {
   SurveyQuestionsData,
   isVisualFigjamArtefact,
 } from "../types/artefacts";
-import { User } from "firebase/auth";
+import type { GoogleUser } from "../services/googleAuth";
 import { isTextBasedArtefact } from "../services/googleDocsService";
 import {
   extractFigmaFileKey,
@@ -79,7 +79,7 @@ interface ArtefactDetailViewProps {
   onUpdateNode?: (nodeId: string, updates: Partial<CanvasNode>) => void;
   onOpenFigjamModal?: () => void;
   isGenerating?: boolean;
-  currentUser?: User | null;
+  currentUser?: GoogleUser | null;
   onGoogleSignIn?: () => Promise<string | null>;
   onCreateGoogleDoc?: (nodeId: string) => Promise<void>;
   isCreatingGoogleDoc?: boolean;
