@@ -23,10 +23,13 @@ export interface DriveFileItem {
   iconLink?: string;
 }
 
+export const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
+export const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
+
 /**
- * Extracts a Google Drive Folder ID from a URL, share link, or raw ID
+ * Extracts a Google Drive Folder or file (e.g. Google Doc) ID from a URL, share link, or raw ID
  */
-export function extractDriveFolderId(input: string): string | null {
+export function extractDriveItemId(input: string): string | null {
   if (!input) return null;
   const trimmed = input.trim();
 
@@ -34,6 +37,12 @@ export function extractDriveFolderId(input: string): string | null {
   const folderUrlMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
   if (folderUrlMatch && folderUrlMatch[1]) {
     return folderUrlMatch[1];
+  }
+
+  // Pattern 1b: docs.google.com/document/d/{docId}/edit or drive.google.com/file/d/{fileId}/view
+  const fileUrlMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileUrlMatch && fileUrlMatch[1]) {
+    return fileUrlMatch[1];
   }
 
   // Pattern 2: ?id={folderId}
@@ -51,13 +60,13 @@ export function extractDriveFolderId(input: string): string | null {
 }
 
 /**
- * Retrieve metadata for a specific Google Drive folder
+ * Retrieve metadata for a specific Google Drive folder or file
  */
-export async function getDriveFolderDetails(
-  folderId: string,
+export async function getDriveItemDetails(
+  itemId: string,
   accessToken: string
-): Promise<DriveFolderInfo> {
-  const url = `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType,webViewLink,modifiedTime&supportsAllDrives=true`;
+): Promise<DriveFileItem> {
+  const url = `https://www.googleapis.com/drive/v3/files/${itemId}?fields=id,name,mimeType,size,webViewLink,modifiedTime,iconLink&supportsAllDrives=true`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -67,10 +76,10 @@ export async function getDriveFolderDetails(
   if (!response.ok) {
     const errText = await response.text();
     if (response.status === 404) {
-      throw new Error("Folder not found. Please check the folder link or permissions.");
+      throw new Error("Not found. Please check the folder or doc link and your permissions.");
     }
     if (response.status === 403 || response.status === 401) {
-      throw new Error("Access denied. Please check that you have permission to view this Google Drive folder.");
+      throw new Error("Access denied. Please check that you have permission to view this Google Drive folder or doc.");
     }
     throw new Error(`Google Drive API error (${response.status}): ${errText}`);
   }
@@ -78,21 +87,23 @@ export async function getDriveFolderDetails(
   const data = await response.json();
   return {
     id: data.id,
-    name: data.name || "Untitled Folder",
-    mimeType: data.mimeType || "application/vnd.google-apps.folder",
+    name: data.name || "Untitled",
+    mimeType: data.mimeType || "application/octet-stream",
+    size: data.size ? Number(data.size) : undefined,
     webViewLink: data.webViewLink,
     modifiedTime: data.modifiedTime,
+    iconLink: data.iconLink,
   };
 }
 
 /**
- * List the user's recent Google Drive folders (for quick 1-click folder selection)
+ * List the user's recent Google Drive folders and Google Docs (for quick 1-click selection)
  */
-export async function listRecentDriveFolders(
+export async function listRecentDriveItems(
   accessToken: string,
   searchQuery: string = ""
 ): Promise<DriveFolderInfo[]> {
-  let q = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+  let q = `(mimeType = '${DRIVE_FOLDER_MIME}' or mimeType = '${GOOGLE_DOC_MIME}') and trashed = false`;
   if (searchQuery.trim()) {
     const escaped = searchQuery.trim().replace(/['\\]/g, "");
     q += ` and name contains '${escaped}'`;
@@ -118,13 +129,13 @@ export async function listRecentDriveFolders(
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Failed to list Drive folders (${response.status}): ${errText}`);
+    throw new Error(`Failed to list Drive items (${response.status}): ${errText}`);
   }
 
   const result = await response.json();
   return (result.files || []).map((f: any) => ({
     id: f.id,
-    name: f.name || "Untitled Folder",
+    name: f.name || "Untitled",
     mimeType: f.mimeType,
     webViewLink: f.webViewLink,
     modifiedTime: f.modifiedTime,
@@ -318,22 +329,38 @@ export async function fetchDriveFileContent(
 }
 
 /**
- * Sync all files from a Google Drive folder and convert them to UploadedDocuments
+ * Sync a Google Drive item and convert it to UploadedDocuments.
+ * A folder imports every file inside it; a single file (e.g. a Google Doc) imports just that file.
  */
-export async function syncDriveFolderFiles(
-  folderId: string,
+export async function syncDriveItem(
+  itemId: string,
   accessToken: string,
   onProgress?: (current: number, total: number, fileName: string) => void
 ): Promise<{
-  folderInfo: DriveFolderInfo;
+  itemInfo: DriveFileItem;
+  isFolder: boolean;
   files: DriveFileItem[];
   documents: UploadedDocument[];
 }> {
-  // 1. Get Folder Info
-  const folderInfo = await getDriveFolderDetails(folderId, accessToken);
+  // 1. Get Item Info
+  const itemInfo = await getDriveItemDetails(itemId, accessToken);
 
-  // 2. List Files
-  const allFiles = await listFilesInDriveFolder(folderId, accessToken);
+  // 2. Single file: import it directly
+  if (itemInfo.mimeType !== DRIVE_FOLDER_MIME) {
+    if (onProgress) {
+      onProgress(1, 1, itemInfo.name);
+    }
+    const doc = await fetchDriveFileContent(itemInfo, accessToken);
+    return {
+      itemInfo,
+      isFolder: false,
+      files: [itemInfo],
+      documents: [doc],
+    };
+  }
+
+  // 3. Folder: list files
+  const allFiles = await listFilesInDriveFolder(itemId, accessToken);
   // Filter out sub-folders or empty files if appropriate
   const processableFiles = allFiles.filter(
     (f) => f.mimeType !== "application/vnd.google-apps.folder"
@@ -363,7 +390,8 @@ export async function syncDriveFolderFiles(
   }
 
   return {
-    folderInfo,
+    itemInfo,
+    isFolder: true,
     files: allFiles,
     documents,
   };

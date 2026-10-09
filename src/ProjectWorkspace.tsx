@@ -342,6 +342,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         generatedData: n.generatedData?.data,
         driveFolderName: n.driveFolderName,
         driveFolderId: n.driveFolderId,
+        driveItemKind: n.driveItemKind,
       }));
     },
     []
@@ -806,16 +807,6 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           )}
 
           {/* Figma / FigJam MCP Connection Status & Config Button */}
-          <a
-            href={project.figjamFileUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
-            title={`Open this project's ${projectFigmaProduct} file`}
-          >
-            Project {projectFigmaProduct} file
-          </a>
-
           <button
             onClick={() => setIsFigjamModalOpen(true)}
             className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors"

@@ -24,11 +24,11 @@ import {
 } from "lucide-react";
 import { CanvasNode, UploadedDocument, DriveFolderFileItem } from "../types/artefacts";
 import {
-  extractDriveFolderId,
-  getDriveFolderDetails,
-  listRecentDriveFolders,
-  syncDriveFolderFiles,
+  extractDriveItemId,
+  listRecentDriveItems,
+  syncDriveItem,
   DriveFolderInfo,
+  DRIVE_FOLDER_MIME,
 } from "../services/googleDriveService";
 
 interface DriveFolderCardProps {
@@ -73,8 +73,14 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
   const documents = node.documents || [];
   const folderId = node.driveFolderId;
   const folderName = node.driveFolderName;
+  const isFile = node.driveItemKind === "file";
   const folderUrl =
-    node.driveFolderUrl || (folderId ? `https://drive.google.com/drive/folders/${folderId}` : "");
+    node.driveFolderUrl ||
+    (folderId
+      ? isFile
+        ? `https://drive.google.com/file/d/${folderId}/view`
+        : `https://drive.google.com/drive/folders/${folderId}`
+      : "");
 
   const formatBytes = (bytes?: number): string => {
     if (!bytes || bytes === 0) return "0 B";
@@ -108,20 +114,20 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
     return <File className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
   };
 
-  // Perform sync of files for a given folder ID
+  // Perform sync of files for a given folder or file ID
   const performSync = async (targetFolderId: string, customToken?: string) => {
     const token = customToken || googleAccessToken;
     if (!token) {
-      setErrorMsg("Please sign in with Google to access Drive folders.");
+      setErrorMsg("Please sign in with Google to access Google Drive.");
       return;
     }
 
     setIsSyncing(true);
     setErrorMsg(null);
-    setSyncProgress("Connecting to Drive folder...");
+    setSyncProgress("Connecting to Google Drive...");
 
     try {
-      const syncResult = await syncDriveFolderFiles(
+      const syncResult = await syncDriveItem(
         targetFolderId,
         token,
         (current, total, file) => {
@@ -139,13 +145,20 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
         iconLink: f.iconLink,
       }));
 
+      const { itemInfo, isFolder } = syncResult;
+      const isDefaultTitle =
+        !node.title || node.title === "Google Drive" || node.title === "Google Drive Folder";
+
       onUpdateNode(node.id, {
-        title: node.title === "Google Drive Folder" || !node.title ? syncResult.folderInfo.name : node.title,
-        driveFolderId: syncResult.folderInfo.id,
-        driveFolderName: syncResult.folderInfo.name,
+        title: isDefaultTitle ? itemInfo.name : node.title,
+        driveItemKind: isFolder ? "folder" : "file",
+        driveFolderId: itemInfo.id,
+        driveFolderName: itemInfo.name,
         driveFolderUrl:
-          syncResult.folderInfo.webViewLink ||
-          `https://drive.google.com/drive/folders/${syncResult.folderInfo.id}`,
+          itemInfo.webViewLink ||
+          (isFolder
+            ? `https://drive.google.com/drive/folders/${itemInfo.id}`
+            : `https://drive.google.com/file/d/${itemInfo.id}/view`),
         driveFolderFiles,
         documents: syncResult.documents,
         driveLastSyncedAt: new Date().toLocaleTimeString([], {
@@ -158,8 +171,8 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
       setShowFolderPicker(false);
       setSyncProgress("");
     } catch (err: any) {
-      console.error("Error syncing Google Drive folder:", err);
-      setErrorMsg(err?.message || "Failed to sync Google Drive folder.");
+      console.error("Error syncing Google Drive item:", err);
+      setErrorMsg(err?.message || "Failed to sync from Google Drive.");
     } finally {
       setIsSyncing(false);
       setSyncProgress("");
@@ -175,27 +188,27 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
       token = await onGoogleSignIn();
     }
     if (!token) {
-      setErrorMsg("Google sign in required to read Drive folders.");
+      setErrorMsg("Google sign in required to read Google Drive.");
       return;
     }
 
-    const parsedId = extractDriveFolderId(folderInput.trim());
+    const parsedId = extractDriveItemId(folderInput.trim());
     if (!parsedId) {
-      setErrorMsg("Could not detect a valid Google Drive folder URL or ID.");
+      setErrorMsg("Could not detect a valid Google Drive folder or Google Doc URL or ID.");
       return;
     }
 
     await performSync(parsedId, token);
   };
 
-  // Fetch recent folders to browse
+  // Fetch recent folders and docs to browse
   const handleOpenFolderPicker = async () => {
     let token = googleAccessToken;
     if (!token && onGoogleSignIn) {
       token = await onGoogleSignIn();
     }
     if (!token) {
-      setErrorMsg("Please sign in with Google to browse folders.");
+      setErrorMsg("Please sign in with Google to browse your Drive.");
       return;
     }
 
@@ -204,23 +217,23 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
     setErrorMsg(null);
 
     try {
-      const folders = await listRecentDriveFolders(token, folderSearch);
+      const folders = await listRecentDriveItems(token, folderSearch);
       setRecentFolders(folders);
     } catch (err: any) {
-      console.error("Failed to list recent folders:", err);
-      setErrorMsg(err?.message || "Could not list Drive folders.");
+      console.error("Failed to list recent Drive items:", err);
+      setErrorMsg(err?.message || "Could not list Drive folders and docs.");
     } finally {
       setIsLoadingFolders(false);
     }
   };
 
-  // Search within recent folders
+  // Search within recent folders and docs
   useEffect(() => {
     if (!showFolderPicker || !googleAccessToken) return;
     const timer = setTimeout(async () => {
       setIsLoadingFolders(true);
       try {
-        const folders = await listRecentDriveFolders(googleAccessToken, folderSearch);
+        const folders = await listRecentDriveItems(googleAccessToken, folderSearch);
         setRecentFolders(folders);
       } catch (err) {
         console.warn(err);
@@ -233,6 +246,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
 
   const handleDisconnectFolder = () => {
     onUpdateNode(node.id, {
+      driveItemKind: undefined,
       driveFolderId: undefined,
       driveFolderName: undefined,
       driveFolderUrl: undefined,
@@ -264,7 +278,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
       {/* Output Port Connector Handle (Right side - passes all folder files into downstream design artefacts) */}
       <div
         onMouseDown={onStartConnection}
-        title="Drag wire to connect Drive folder files into downstream assets"
+        title="Drag wire to connect Drive files into downstream assets"
         className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-700 border-2 border-white shadow-xs flex items-center justify-center cursor-crosshair hover:bg-slate-900 transition-colors z-10"
       >
         <div className="w-1.5 h-1.5 rounded-full bg-white pointer-events-none" />
@@ -283,11 +297,11 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
             value={node.title}
             onChange={(e) => onUpdateNode(node.id, { title: e.target.value })}
             className="text-xs font-semibold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-600 focus:bg-white focus:outline-none px-1 rounded transition-colors w-full truncate"
-            placeholder="Drive Folder Title"
+            placeholder="Google Drive Title"
           />
 
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 shrink-0 uppercase tracking-wider">
-            Drive Folder
+            {folderId ? (isFile ? "Google Doc" : "Drive Folder") : "Google Drive"}
           </span>
         </div>
 
@@ -295,14 +309,14 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
           <button
             onClick={() => onDuplicateNode(node.id)}
             className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
-            title="Duplicate folder block"
+            title="Duplicate Drive block"
           >
             <CopyPlus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onRemoveNode(node.id)}
             className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
-            title="Delete folder block"
+            title="Delete Drive block"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -325,17 +339,17 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
           </div>
         )}
 
-        {/* State 1: Folder Not Connected Yet */}
+        {/* State 1: Nothing Connected Yet */}
         {!folderId ? (
           <div className="space-y-2.5">
             <p className="text-[11px] text-slate-600 leading-snug">
-              Add a Google Drive folder as an input to automatically import briefs, transcripts, and research documents.
+              Add a Google Drive folder or Google Doc as an input to automatically import briefs, transcripts, and research documents.
             </p>
 
-            {/* Quick URL / Folder ID input */}
+            {/* Quick URL / ID input */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
-                Paste Folder Link or ID
+                Paste Folder or Doc Link
               </label>
               <div className="flex items-center gap-1.5">
                 <input
@@ -348,7 +362,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                       handleConnectFolderByInput();
                     }
                   }}
-                  placeholder="https://drive.google.com/drive/folders/..."
+                  placeholder="Drive folder or docs.google.com link..."
                   className="flex-1 px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-600 focus:bg-white transition-colors"
                 />
                 <button
@@ -373,27 +387,31 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
               <div className="h-px bg-slate-200 flex-1" />
             </div>
 
-            {/* Browse user's Drive folders */}
+            {/* Browse user's Drive folders and docs */}
             <button
               type="button"
               onClick={handleOpenFolderPicker}
               className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <FolderOpen className="w-3.5 h-3.5 text-slate-600" />
-              <span>Browse Your Drive Folders</span>
+              <span>Browse Your Drive</span>
             </button>
           </div>
         ) : (
-          /* State 2: Folder Connected and Synced */
+          /* State 2: Folder or Doc Connected and Synced */
           <div className="space-y-2.5">
             {/* Active Folder Header Banner */}
             <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-1.5 min-w-0">
-                  <Folder className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                  {isFile ? (
+                    <FileText className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <Folder className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                  )}
                   <div className="min-w-0">
                     <h4 className="text-xs font-semibold text-slate-900 truncate">
-                      {folderName || "Connected Drive Folder"}
+                      {folderName || (isFile ? "Connected Google Doc" : "Connected Drive Folder")}
                     </h4>
                     <p className="text-[10px] text-slate-500">
                       {documents.length} file{documents.length === 1 ? "" : "s"} synced into canvas
@@ -408,7 +426,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
-                      title="Open folder in Google Drive"
+                      title={isFile ? "Open in Google Docs" : "Open folder in Google Drive"}
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
@@ -417,7 +435,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                     onClick={() => performSync(folderId)}
                     disabled={isSyncing}
                     className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
-                    title="Re-sync folder files"
+                    title={isFile ? "Re-sync doc" : "Re-sync folder files"}
                   >
                     <RefreshCw
                       className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-slate-600" : ""}`}
@@ -426,7 +444,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                   <button
                     onClick={handleDisconnectFolder}
                     className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                    title="Disconnect folder"
+                    title={isFile ? "Disconnect doc" : "Disconnect folder"}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -486,12 +504,12 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
               </div>
             ) : (
               <div className="py-4 text-center text-slate-400 text-[11px] bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
-                <p>No files found inside this Drive folder yet.</p>
+                <p>{isFile ? "No content found in this doc yet." : "No files found inside this Drive folder yet."}</p>
                 <button
                   onClick={() => performSync(folderId)}
                   className="mt-1 text-slate-600 hover:text-slate-900 hover:underline font-medium text-[11px]"
                 >
-                  Refresh folder
+                  {isFile ? "Refresh doc" : "Refresh folder"}
                 </button>
               </div>
             )}
@@ -500,7 +518,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
             {isSyncing && (
               <div className="flex items-center gap-2 text-[11px] text-slate-700 bg-slate-100 p-2 rounded-lg border border-slate-200">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-slate-600" />
-                <span className="truncate">{syncProgress || "Syncing Drive folder..."}</span>
+                <span className="truncate">{syncProgress || "Syncing from Google Drive..."}</span>
               </div>
             )}
 
@@ -530,7 +548,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
         )}
       </div>
 
-      {/* Modal / Popover: Folder Picker Dialog */}
+      {/* Modal / Popover: Folder & Doc Picker Dialog */}
       {showFolderPicker && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -542,10 +560,10 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-slate-900">
-                    Select Google Drive Folder
+                    Select from Google Drive
                   </h3>
                   <p className="text-[10px] text-slate-500">
-                    Choose a folder from your Google Drive
+                    Choose a folder or Google Doc from your Drive
                   </p>
                 </div>
               </div>
@@ -565,7 +583,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                   type="text"
                   value={folderSearch}
                   onChange={(e) => setFolderSearch(e.target.value)}
-                  placeholder="Search folders by name..."
+                  placeholder="Search folders and docs by name..."
                   className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-600 focus:bg-white"
                 />
               </div>
@@ -579,7 +597,7 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
               {isLoadingFolders ? (
                 <div className="py-8 text-center text-slate-500 text-xs flex flex-col items-center gap-2">
                   <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
-                  <span>Loading your Google Drive folders...</span>
+                  <span>Loading your Google Drive...</span>
                 </div>
               ) : recentFolders.length > 0 ? (
                 recentFolders.map((f) => (
@@ -590,7 +608,11 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                     className="w-full p-2.5 rounded-lg hover:bg-slate-50 text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <Folder className="w-4 h-4 text-slate-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      {f.mimeType === DRIVE_FOLDER_MIME ? (
+                        <Folder className="w-4 h-4 text-slate-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      ) : (
+                        <FileText className="w-4 h-4 text-slate-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      )}
                       <div className="min-w-0">
                         <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-slate-900">
                           {f.name}
@@ -609,9 +631,9 @@ export const DriveFolderCard: React.FC<DriveFolderCardProps> = ({
                 ))
               ) : (
                 <div className="py-8 text-center text-slate-400 text-xs">
-                  <p>No Google Drive folders found.</p>
+                  <p>No Google Drive folders or docs found.</p>
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Try pasting the folder URL directly above.
+                    Try pasting the folder or doc URL directly above.
                   </p>
                 </div>
               )}

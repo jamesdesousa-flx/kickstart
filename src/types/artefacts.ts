@@ -315,7 +315,8 @@ export interface CanvasNode {
   noteText?: string;
   noteColor?: StickyNoteColor;
 
-  // Google Drive Folder fields
+  // Google Drive fields (a folder or a single file such as a Google Doc)
+  driveItemKind?: "folder" | "file";
   driveFolderId?: string;
   driveFolderName?: string;
   driveFolderUrl?: string;
@@ -411,15 +412,15 @@ export const ARTEFACT_LIBRARY_ITEMS: ArtefactLibraryItem[] = [
   },
   {
     type: "drive-folder",
-    name: "Google Drive Folder",
+    name: "Google Drive",
     badge: "Input",
     category: "Input",
-    description: "Connect a Google Drive folder by URL or browse your Drive folders to import briefs, notes, and research into canvas.",
+    description: "Connect a Google Drive folder or Google Doc by URL, or browse your Drive, to import briefs, notes, and research into canvas.",
     color: "slate",
     accentBg: "bg-slate-100",
     accentBorder: "border-slate-200",
     accentText: "text-slate-700",
-    defaultTitle: "Google Drive Folder",
+    defaultTitle: "Google Drive",
   },
   {
     type: "interview-script",

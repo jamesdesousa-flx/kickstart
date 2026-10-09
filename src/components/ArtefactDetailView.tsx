@@ -416,7 +416,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 text-[11px] font-medium"
                   >
                     <span className="text-[10px] text-slate-400">
-                      {src.type === "drive-folder" ? "[drive folder]" : `[${src.type.replace("-", " ")}]`}
+                      {src.type === "drive-folder" ? ((src as any).driveItemKind === "file" ? "[google doc]" : "[drive folder]") : `[${src.type.replace("-", " ")}]`}
                     </span>
                     {src.title}
                   </span>
@@ -440,11 +440,11 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
               {upstreamSources.map((src, i) => (
                 <div key={src.id} className="pb-1.5 border-b border-slate-100 last:border-0">
                   <div className="font-semibold text-slate-800 text-[11px]">
-                    #{i + 1} {src.title} ({src.type === "drive-folder" ? "Google Drive Folder" : src.type})
+                    #{i + 1} {src.title} ({src.type === "drive-folder" ? ((src as any).driveItemKind === "file" ? "Google Doc" : "Google Drive Folder") : src.type})
                   </div>
                   {(src as any).driveFolderName && (
                     <p className="text-amber-700 font-medium text-[10px] mt-0.5">
-                      📁 Google Drive Folder: {(src as any).driveFolderName}
+                      {(src as any).driveItemKind === "file" ? "📄 Google Doc" : "📁 Google Drive Folder"}: {(src as any).driveFolderName}
                     </p>
                   )}
                   {src.contextText && (

@@ -698,7 +698,8 @@ function extractSummaryTextFromInputs(upstreamInputs: any[]): string {
   const parts: string[] = [];
   for (const input of upstreamInputs) {
     if (input.type === "drive-folder" || input.driveFolderName) {
-      parts.push(`[Google Drive Folder: ${input.driveFolderName || input.title}]: (${input.documents?.length || 0} synced documents)`);
+      const driveLabel = input.driveItemKind === "file" ? "Google Doc" : "Google Drive Folder";
+      parts.push(`[${driveLabel}: ${input.driveFolderName || input.title}]: (${input.documents?.length || 0} synced documents)`);
     }
     if (input.contextText?.trim()) {
       parts.push(`[${input.title || "Context"}]: ${input.contextText.trim()}`);
@@ -1282,6 +1283,7 @@ export async function generateArtefact(params: {
     contextText?: string;
     driveFolderName?: string;
     driveFolderId?: string;
+    driveItemKind?: "folder" | "file";
     documents?: Array<{
       name: string;
       mimeType: string;
@@ -1309,7 +1311,7 @@ export async function generateArtefact(params: {
       const inp = upstreamInputs[i];
       contextDescription += `--- SOURCE #${i + 1}: [Type: ${inp.type}] "${inp.title}" ---\n`;
       if (inp.driveFolderName) {
-        contextDescription += `Google Drive Folder: ${inp.driveFolderName}\n`;
+        contextDescription += `${inp.driveItemKind === "file" ? "Google Doc" : "Google Drive Folder"}: ${inp.driveFolderName}\n`;
       }
       if (inp.contextText?.trim()) {
         contextDescription += `Notes / Text Context:\n${inp.contextText.trim()}\n`;
