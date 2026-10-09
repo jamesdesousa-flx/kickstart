@@ -24,6 +24,7 @@ export const GOOGLE_WORKSPACE_SCOPES = [
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/documents",
+  "https://www.googleapis.com/auth/forms.body",
 ];
 
 const provider = new GoogleAuthProvider();
@@ -41,8 +42,8 @@ let isSigningIn = false;
 let cachedAccessToken: string | null = null;
 
 /**
- * The app's Google SSO (Supabase) asks for the Drive and Docs scopes too, so its Google access
- * token works for Drive and Docs. Supabase only hands that token over once, right after sign-in,
+ * The app's Google SSO (Supabase) asks for the Drive, Docs and Forms scopes too, so its Google access
+ * token works for Drive, Docs and Forms. Supabase only hands that token over once, right after sign-in,
  * so it is kept in sessionStorage for this tab until it expires. After that, the user connects
  * again with the Firebase popup below.
  */

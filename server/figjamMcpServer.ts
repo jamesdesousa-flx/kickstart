@@ -984,7 +984,7 @@ export function generateFigjamCanvasElements(
     .join("\n");
 
   const svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">
-    <rect width="100%" height="100%" fill="#F8FAFC"/>
+    <rect width="100%" height="100%" fill="#FFFFFF"/>
     ${svgShapes}
   </svg>`;
 
@@ -1255,6 +1255,8 @@ try {
     await figma.setCurrentPageAsync(created);
     page = created;
     newPage = true;
+    // A new page gets a white canvas, not the editor's default grey
+    try { page.backgrounds = [{ type: "SOLID", color: hex("#FFFFFF") }]; } catch (e) {}
   } catch (e) {
     created.remove();
   }
@@ -1423,10 +1425,8 @@ const maxY = Math.max(...placed.map((n) => n.y + n.height));
 section = figma.createSection();
 made.push(section);
 section.name = spec.sectionTitle;
-// Affinity maps (the only artefact with groups) use an all-white board
-if (groupSections.length) {
-  try { section.fills = [{ type: "SOLID", color: hex("#FFFFFF") }]; } catch (e) {}
-}
+// Every artefact sits on a white board so its text stays legible
+try { section.fills = [{ type: "SOLID", color: hex("#FFFFFF") }]; } catch (e) {}
 section.x = minX - 80;
 section.y = minY - 120;
 section.resizeWithoutConstraints(maxX - minX + 160, maxY - minY + 200);

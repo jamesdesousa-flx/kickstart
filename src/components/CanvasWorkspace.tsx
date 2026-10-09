@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FigmaLogo } from "./ProductLogo";
 import { figmaProductName } from "../services/figjamMcpService";
+import { isGoogleFormArtefact } from "../services/googleDocsService";
 import {
   ZoomIn,
   ZoomOut,
@@ -1304,7 +1305,7 @@ const GenerativeArtefactCard: React.FC<GenerativeArtefactCardProps> = ({
             {node.googleDocId && (
               <span className="ml-1.5 px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold inline-flex items-center gap-0.5">
                 <FileText className="w-2.5 h-2.5 text-blue-600" />
-                <span>Doc</span>
+                <span>{isGoogleFormArtefact(node.type) ? "Form" : "Doc"}</span>
               </span>
             )}
             {node.figjamFileId && (

@@ -11,6 +11,7 @@ import {
   UserPersonaData,
   ResearchReportData,
 } from "../types/artefacts";
+import { createGoogleFormForSurvey } from "./googleFormsService";
 
 /**
  * Returns whether an artefact type is fundamentally text/document-based
@@ -23,6 +24,39 @@ export function isTextBasedArtefact(type: ArtefactType): boolean {
     type === "user-persona" ||
     type === "research-report"
   );
+}
+
+/**
+ * Survey questions become a Google Form. Every other text artefact becomes a Google Doc.
+ */
+export function isGoogleFormArtefact(type: ArtefactType): boolean {
+  return type === "survey-questions";
+}
+
+/**
+ * The name of the Google file a text artefact is created as, e.g. "Google Form"
+ */
+export function googleFileLabel(type: ArtefactType): "Google Form" | "Google Doc" {
+  return isGoogleFormArtefact(type) ? "Google Form" : "Google Doc";
+}
+
+/**
+ * Links to open and embed the Google file stored on a node (googleDocId holds a form ID for surveys)
+ */
+export function googleFileLinks(type: ArtefactType, fileId: string, fileUrl?: string) {
+  if (isGoogleFormArtefact(type)) {
+    return {
+      openUrl: fileUrl || `https://docs.google.com/forms/d/${fileId}/edit`,
+      // The Forms editor can't be framed, so only the responder view is embedded
+      editEmbedUrl: null,
+      previewEmbedUrl: `https://docs.google.com/forms/d/${fileId}/viewform?embedded=true`,
+    };
+  }
+  return {
+    openUrl: fileUrl || `https://docs.google.com/document/d/${fileId}/edit`,
+    editEmbedUrl: `https://docs.google.com/document/d/${fileId}/edit?embedded=true`,
+    previewEmbedUrl: `https://docs.google.com/document/d/${fileId}/preview`,
+  };
 }
 
 /**
@@ -476,7 +510,8 @@ export interface GoogleDocCreationResult {
 }
 
 /**
- * Creates a real Google Doc in the authenticated user's Google Drive via Google Docs API
+ * Creates a real Google Doc in the authenticated user's Google Drive via Google Docs API.
+ * Survey questions are created as a Google Form instead; the result then holds the form ID and URL.
  */
 export async function createGoogleDocForArtefact(params: {
   title: string;
@@ -485,6 +520,11 @@ export async function createGoogleDocForArtefact(params: {
   accessToken: string;
 }): Promise<GoogleDocCreationResult> {
   const { title, type, data, accessToken } = params;
+
+  if (isGoogleFormArtefact(type)) {
+    const form = await createGoogleFormForSurvey({ title, data: data as SurveyQuestionsData, accessToken });
+    return { documentId: form.formId, documentUrl: form.formUrl, embedUrl: form.responderUrl };
+  }
 
   const docTitle = `${title} (${new Date().toISOString().slice(0, 10)})`;
   const { text: formattedText, styleRequests } = buildGoogleDocContent(title, type, data);

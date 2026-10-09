@@ -37,6 +37,7 @@ import {
 import {
   isTextBasedArtefact,
   createGoogleDocForArtefact,
+  googleFileLabel,
 } from "./services/googleDocsService";
 import {
   generateFigjamArtefactViaMcp,
@@ -384,10 +385,11 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
     showNotification("Disconnected Google account");
   };
 
-  // Create or sync a Google Doc for any generated artefact
+  // Create or sync a Google Doc (or Google Form, for surveys) for any generated artefact
   const handleCreateOrSyncGoogleDoc = async (nodeId: string) => {
     const targetNode = nodesRef.current.find((n) => n.id === nodeId);
     if (!targetNode || !targetNode.generatedData?.data) return;
+    const fileLabel = googleFileLabel(targetNode.type);
 
     let token = googleAccessToken;
     if (!token) {
@@ -397,13 +399,13 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       token = await handleGoogleSignIn();
     }
     if (!token) {
-      showNotification("Please sign in with Google to create a Google Doc.");
+      showNotification(`Please sign in with Google to create a ${fileLabel}.`);
       return;
     }
 
     setIsCreatingGoogleDoc(true);
     try {
-      showNotification(`Creating Google Doc for ${targetNode.title}...`);
+      showNotification(`Creating ${fileLabel} for ${targetNode.title}...`);
       const docResult = await createGoogleDocForArtefact({
         title: targetNode.title,
         type: targetNode.type,
@@ -418,11 +420,11 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         error: null,
       });
 
-      showNotification(`Created Google Doc for ${targetNode.title}!`);
+      showNotification(`Created ${fileLabel} for ${targetNode.title}!`);
     } catch (err: any) {
-      console.error("Failed to create Google Doc:", err);
+      console.error(`Failed to create ${fileLabel}:`, err);
       showNotification(
-        `Google Doc creation failed: ${err?.message || "Check permissions"}`
+        `${fileLabel} creation failed: ${err?.message || "Check permissions"}`
       );
     } finally {
       setIsCreatingGoogleDoc(false);
@@ -578,7 +580,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         googleAccessToken || (await getAccessToken()) || (await handleGoogleSignIn());
       if (!googleToken) {
         const message =
-          "Sign in with Google to generate this asset. Text assets are created as Google Docs.";
+          `Sign in with Google to generate this asset. It is created as a ${googleFileLabel(targetNode.type)}.`;
         showNotification(message);
         handleUpdateNode(nodeId, { isGenerating: false, error: message });
         setActiveDetailNodeId(nodeId);
@@ -614,11 +616,12 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       let googleDocUrl = targetNode.googleDocUrl;
       let googleDocCreatedAt = targetNode.googleDocCreatedAt;
 
-      // For all text-based artefacts, the Google Doc is the only output
+      // For all text-based artefacts, the Google Doc (or Form, for surveys) is the only output
+      const fileLabel = googleFileLabel(targetNode.type);
       let googleDocError: string | null = null;
       if (googleToken) {
         try {
-          showNotification(`Creating Google Doc for ${targetNode.title}...`);
+          showNotification(`Creating ${fileLabel} for ${targetNode.title}...`);
           const docResult = await createGoogleDocForArtefact({
             title: targetNode.title,
             type: targetNode.type,
@@ -629,8 +632,8 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           googleDocUrl = docResult.documentUrl;
           googleDocCreatedAt = new Date().toISOString();
         } catch (docErr: any) {
-          console.error("Failed to create Google Doc:", docErr);
-          googleDocError = `Google Doc creation failed: ${docErr?.message || "Check permissions"}`;
+          console.error(`Failed to create ${fileLabel}:`, docErr);
+          googleDocError = `${fileLabel} creation failed: ${docErr?.message || "Check permissions"}`;
           // The old Doc no longer matches the new content, so don't keep showing it
           googleDocId = undefined;
           googleDocUrl = undefined;
@@ -699,7 +702,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         // Success message was already shown with the FigJam draw summary
       } else if (googleDocId) {
         showNotification(
-          `Generated & created Google Doc for ${targetNode.title}!`
+          `Generated & created ${fileLabel} for ${targetNode.title}!`
         );
       } else {
         showNotification(`Generated ${targetNode.title}!`);

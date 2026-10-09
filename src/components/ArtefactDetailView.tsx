@@ -53,6 +53,7 @@ import {
   getDefaultFigjamBoardUrl,
 } from "../services/figjamMcpService";
 import { FigmaLogo } from "./ProductLogo";
+import { googleFileLabel, googleFileLinks, isGoogleFormArtefact } from "../services/googleDocsService";
 
 interface UpstreamSourceInfo {
   id: string;
@@ -117,6 +118,16 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
   );
 
   const [embedMode, setEmbedMode] = useState<"edit" | "preview">("preview");
+  // Surveys are created as a Google Form, every other text artefact as a Google Doc
+  const isGoogleForm = isGoogleFormArtefact(node.type);
+  const googleFile = {
+    label: googleFileLabel(node.type),
+    appName: isGoogleForm ? "Forms" : "Docs",
+    color: isGoogleForm ? "#673AB7" : "#4285F4",
+    links: node.googleDocId ? googleFileLinks(node.type, node.googleDocId, node.googleDocUrl) : null,
+  };
+  const googleFileEmbedUrl =
+    (embedMode === "edit" && googleFile.links?.editEmbedUrl) || googleFile.links?.previewEmbedUrl;
   const [boardUrlInput, setBoardUrlInput] = useState(
     node.figjamFileUrl || node.figjamFileId || localConnectedKey || ""
   );
@@ -744,52 +755,56 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
 
               {hasData && !isGenerating && (
                 <div className="space-y-4">
-                  {/* Google Doc embed if enabled */}
-                  {node.googleDocId ? (
+                  {/* Google Doc or Form embed if enabled */}
+                  {node.googleDocId && googleFile.links ? (
                     <div className="flex flex-col space-y-3 animate-in fade-in duration-150">
-                      {/* Embedded Google Doc Toolbar */}
+                      {/* Embedded Google Doc or Form Toolbar */}
                       <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
                             <svg className="w-4 h-4" viewBox="0 0 24 24">
-                              <path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" />
+                              <path fill={googleFile.color} d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" />
                               <path fill="#ffffff" d="M14 2v6h6" opacity="0.4" />
                               <path fill="#ffffff" d="M8 12h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
                             </svg>
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-xs font-bold text-slate-900 truncate">Google Doc</span>
+                              <span className="text-xs font-bold text-slate-900 truncate">{googleFile.label}</span>
                               <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Live in Drive</span>
                             </div>
-                            <p className="text-[11px] text-slate-500 truncate">Interactive document embedded from your Google Drive</p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {isGoogleForm ? "Live form preview from your Google Drive" : "Interactive document embedded from your Google Drive"}
+                            </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                          <div className="bg-slate-100 p-0.5 rounded-lg flex items-center text-xs">
-                            <button
-                              onClick={() => setEmbedMode("edit")}
-                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${embedMode === "edit" ? "bg-white text-blue-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
-                            >
-                              Editor
-                            </button>
-                            <button
-                              onClick={() => setEmbedMode("preview")}
-                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${embedMode === "preview" ? "bg-white text-blue-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
-                            >
-                              Preview
-                            </button>
-                          </div>
+                          {googleFile.links.editEmbedUrl && (
+                            <div className="bg-slate-100 p-0.5 rounded-lg flex items-center text-xs">
+                              <button
+                                onClick={() => setEmbedMode("edit")}
+                                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${embedMode === "edit" ? "bg-white text-blue-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                              >
+                                Editor
+                              </button>
+                              <button
+                                onClick={() => setEmbedMode("preview")}
+                                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${embedMode === "preview" ? "bg-white text-blue-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                              >
+                                Preview
+                              </button>
+                            </div>
+                          )}
 
                           <a
-                            href={node.googleDocUrl || `https://docs.google.com/document/d/${node.googleDocId}/edit`}
+                            href={googleFile.links.openUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-2.5 py-1 text-xs font-medium text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center gap-1 transition-colors"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span>Open in Docs</span>
+                            <span>Open in {googleFile.appName}</span>
                           </a>
 
                           {onCreateGoogleDoc && (
@@ -807,7 +822,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       <div className="w-full h-[620px] rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs flex flex-col relative">
                         <iframe
                           key={`${node.googleDocId}-${embedMode}`}
-                          src={embedMode === "edit" ? `https://docs.google.com/document/d/${node.googleDocId}/edit?embedded=true` : `https://docs.google.com/document/d/${node.googleDocId}/preview`}
+                          src={googleFileEmbedUrl}
                           className="w-full flex-1 border-0 bg-white"
                           title={node.title}
                           allow="clipboard-read; clipboard-write"
@@ -815,20 +830,20 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       </div>
                     </div>
                   ) : (
-                    /* Text artefacts are only ever shown as an embedded Google Doc */
+                    /* Text artefacts are only ever shown as an embedded Google Doc or Form */
                     <div className="min-h-[300px] flex flex-col items-center justify-center text-center p-6 bg-white border border-slate-200 rounded-xl">
                       <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center mb-2.5">
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" />
+                          <path fill={googleFile.color} d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" />
                           <path fill="#ffffff" d="M14 2v6h6" opacity="0.4" />
                           <path fill="#ffffff" d="M8 12h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
                         </svg>
                       </div>
                       <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                        Google Doc not created yet
+                        {googleFile.label} not created yet
                       </h3>
                       <p className="text-xs text-slate-500 max-w-sm mb-4 leading-relaxed">
-                        {badgeInfo.label} content is only shown as a Google Doc. Create the doc in your Google Drive to view and edit it here.
+                        {badgeInfo.label} content is only shown as a {googleFile.label}. Create it in your Google Drive to view and edit it here.
                       </p>
                       <button
                         onClick={() => onCreateGoogleDoc?.(node.id)}
@@ -838,12 +853,12 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                         {isCreatingGoogleDoc ? (
                           <>
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Creating Doc...</span>
+                            <span>Creating {isGoogleForm ? "Form" : "Doc"}...</span>
                           </>
                         ) : (
                           <>
                             <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Create Google Doc</span>
+                            <span>Create {googleFile.label}</span>
                           </>
                         )}
                       </button>
