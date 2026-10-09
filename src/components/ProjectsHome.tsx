@@ -4,14 +4,16 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { Plus, FolderOpen, Trash2, X, ExternalLink, Loader2, AlertCircle, LogOut } from "lucide-react";
+import { Plus, FolderOpen, Trash2, X, ExternalLink, Loader2, AlertCircle, LogOut, Pencil } from "lucide-react";
 import { KickstartMark } from "./KickstartMark";
+import { ProjectNameInput } from "./ProjectNameInput";
 import {
   Project,
   ProjectSummary,
   listProjects,
   createProject,
   deleteProject,
+  renameProject,
 } from "../services/projectsService";
 
 interface ProjectsHomeProps {
@@ -33,6 +35,7 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
 
   const refresh = async () => {
     setLoadError(null);
@@ -57,6 +60,11 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
     } catch (err: any) {
       window.alert(`Could not delete the project: ${err?.message || "Unknown error"}`);
     }
+  };
+
+  const handleRename = async (project: ProjectSummary, name: string) => {
+    const renamed = await renameProject(project.id, name);
+    setProjects((prev) => prev?.map((p) => (p.id === project.id ? { ...p, ...renamed } : p)) || null);
   };
 
   return (
@@ -124,16 +132,41 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {projects.map((project) => (
               <li key={project.id} className="group relative">
-                <button
-                  onClick={() => onOpenProject(project)}
-                  className="w-full text-left p-4 bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm rounded-xl transition-all"
+                {renamingProjectId === project.id ? (
+                  <div className="w-full p-4 bg-white border border-slate-300 shadow-sm rounded-xl">
+                    <ProjectNameInput
+                      initialName={project.name}
+                      onSave={(name) => handleRename(project, name)}
+                      onDone={() => setRenamingProjectId(null)}
+                      className="w-full text-sm font-semibold text-slate-900"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      {project.nodeCount} {project.nodeCount === 1 ? "block" : "blocks"} · {formatUpdated(project.updatedAt)}
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => onOpenProject(project)}
+                    className="w-full text-left p-4 bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm rounded-xl transition-all"
+                  >
+                    <p className="text-sm font-semibold text-slate-900 truncate pr-20">{project.name}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {project.nodeCount} {project.nodeCount === 1 ? "block" : "blocks"} · {formatUpdated(project.updatedAt)}
+                    </p>
+                  </button>
+                )}
+                <div
+                  className={`absolute top-3 right-3 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ${
+                    renamingProjectId === project.id ? "hidden" : ""
+                  }`}
                 >
-                  <p className="text-sm font-semibold text-slate-900 truncate pr-14">{project.name}</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {project.nodeCount} {project.nodeCount === 1 ? "block" : "blocks"} · {formatUpdated(project.updatedAt)}
-                  </p>
-                </button>
-                <div className="absolute top-3 right-3 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => setRenamingProjectId(project.id)}
+                    title="Rename project"
+                    className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
                   <a
                     href={project.figjamFileUrl}
                     target="_blank"

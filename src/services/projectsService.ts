@@ -88,6 +88,20 @@ export async function createProject(params: { name: string; figjamUrl: string })
   return toProject(data);
 }
 
+export async function renameProject(projectId: string, name: string): Promise<Project> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Give the project a name.");
+
+  const { data, error } = await supabase
+    .from("projects")
+    .update({ name: trimmed })
+    .eq("id", projectId)
+    .select(PROJECT_COLUMNS)
+    .single();
+  if (error) throw new Error(error.message);
+  return toProject(data);
+}
+
 export async function deleteProject(projectId: string): Promise<void> {
   const { error } = await supabase.from("projects").delete().eq("id", projectId);
   if (error) throw new Error(error.message);

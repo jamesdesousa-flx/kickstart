@@ -46,7 +46,7 @@ import {
   figmaProductName,
 } from "./services/figjamMcpService";
 import { FigmaLogo } from "./components/ProductLogo";
-import { Project, ProjectCanvasSaver } from "./services/projectsService";
+import { Project, ProjectCanvasSaver, renameProject } from "./services/projectsService";
 import { apiFetch } from "./services/authService";
 import {
   CanvasNode,
@@ -62,6 +62,7 @@ import { CanvasWorkspace } from "./components/CanvasWorkspace";
 import { ArtefactDetailView } from "./components/ArtefactDetailView";
 import { FigjamMcpModal } from "./components/FigjamMcpModal";
 import { KickstartMark } from "./components/KickstartMark";
+import { ProjectNameInput } from "./components/ProjectNameInput";
 
 interface ProjectWorkspaceProps {
   project: Project;
@@ -78,6 +79,8 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
   const [isLibraryOpen, setIsLibraryOpen] = useState<boolean>(initialCanvas.nodes.length === 0);
   const [activeDetailNodeId, setActiveDetailNodeId] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState(project.name);
+  const [isRenaming, setIsRenaming] = useState(false);
 
   // Google Workspace Authentication State
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
@@ -757,9 +760,22 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           <KickstartMark />
           <span className="text-sm font-semibold tracking-tight text-slate-400">Kickstart</span>
           <span className="text-sm text-slate-300">/</span>
-          <span className="text-sm font-semibold tracking-tight text-slate-900 truncate max-w-[240px]">
-            {project.name}
-          </span>
+          {isRenaming ? (
+            <ProjectNameInput
+              initialName={projectName}
+              onSave={async (name) => setProjectName((await renameProject(project.id, name)).name)}
+              onDone={() => setIsRenaming(false)}
+              className="w-[240px] text-sm font-semibold tracking-tight text-slate-900"
+            />
+          ) : (
+            <button
+              onClick={() => setIsRenaming(true)}
+              title="Rename project"
+              className="px-1.5 -mx-1.5 py-0.5 rounded-md border border-transparent hover:border-slate-200 hover:bg-slate-50 text-sm font-semibold tracking-tight text-slate-900 truncate max-w-[240px] transition-colors"
+            >
+              {projectName}
+            </button>
+          )}
           <span
             className={`ml-1 text-[11px] font-medium flex items-center gap-1 ${
               saveStatus === "error" ? "text-red-600" : "text-slate-400"
