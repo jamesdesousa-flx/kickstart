@@ -351,6 +351,13 @@ export interface FigjamSection {
   height: number;
 }
 
+/** Nodes wrapped in their own section inside the artefact section, e.g. an affinity map theme */
+export interface FigjamGroup {
+  id: string;
+  title: string;
+  memberIds: string[];
+}
+
 export interface FigjamCanvasPayload {
   title: string;
   artefactType: string;
@@ -360,6 +367,7 @@ export interface FigjamCanvasPayload {
   sections: FigjamSection[];
   screens: FigjamScreen[];
   labels: FigjamLabel[];
+  groups: FigjamGroup[];
   tsvData: string;
   svgData: string;
 }
@@ -415,6 +423,7 @@ export function generateFigjamCanvasElements(
   const sections: FigjamSection[] = [];
   const screens: FigjamScreen[] = [];
   const labels: FigjamLabel[] = [];
+  const groups: FigjamGroup[] = [];
   const tsvLines: string[] = [];
 
   const startX = 120;
@@ -669,6 +678,162 @@ export function generateFigjamCanvasElements(
 
       colX += 350;
     });
+  } else if (artefactType === "affinity-map") {
+    // Note kinds keep one colour each, so a theme's mix of pain points and insights shows at a glance
+    const KIND_STYLE: Record<string, { label: string; color: FigjamSticky["color"]; fill: string }> = {
+      insight: { label: "Insight", color: "GREEN", fill: "#B3EFBD" },
+      "pain-point": { label: "Pain point", color: "PINK", fill: "#FFC6E6" },
+      finding: { label: "Finding", color: "BLUE", fill: "#C2E5FF" },
+      quote: { label: "Quote", color: "YELLOW", fill: "#FFE299" },
+    };
+    const STICKY = 240;
+    const COL_GAP = 40;
+    const THEME_GAP = 200;
+    const asNotes = (list: any): any[] => (Array.isArray(list) ? list.filter((n: any) => n && n.text) : []);
+    const noteText = (n: any) => `${str(n.text)}${n.source ? `\n— ${str(n.source)}` : ""}`;
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const noteColor = (n: any) => (KIND_STYLE[n.kind] || KIND_STYLE.finding).color;
+    // Count distinct sources so each theme shows how widely it is supported
+    const sourcesOf = (notes: any[]) =>
+      new Set(notes.flatMap((n) => str(n.source).split(/[,;&]/).map((x) => x.trim()).filter(Boolean)));
+
+    const themes = (Array.isArray(data.themes) ? data.themes : []).map((t: any) => ({
+      ...t,
+      clusters: (Array.isArray(t.clusters) ? t.clusters : []).filter((c: any) => asNotes(c.notes).length > 0),
+    })).filter((t: any) => t.clusters.length > 0);
+    const outliers = asNotes(data.outliers);
+    const takeaways: string[] = Array.isArray(data.keyTakeaways) ? data.keyTakeaways.map(str).filter(Boolean) : [];
+    const sources: string[] = Array.isArray(data.sources) ? data.sources.map(str).filter(Boolean) : [];
+
+    sections.push({
+      id: "sec_affinity_1",
+      title: `Affinity Map: ${title || "Research Synthesis"}`,
+      x: startX - 40,
+      y: startY - 80,
+      width: 1200,
+      height: 900,
+    });
+
+    tsvLines.push(`[Affinity Map] ${title}`);
+    if (data.researchQuestion) tsvLines.push(`Research question: ${data.researchQuestion}`);
+    if (sources.length) tsvLines.push(`Sources: ${sources.join(", ")}`);
+    tsvLines.push("");
+
+    // Header: research question, sources and a colour key
+    let y = startY;
+    labels.push({
+      id: "label_affinity_question",
+      text: data.researchQuestion ? `Research question: ${str(data.researchQuestion)}` : title || "Affinity Map",
+      x: startX,
+      y,
+      width: 1400,
+      size: 28,
+      weight: "Bold",
+      color: WF.ink,
+    });
+    y += 80;
+    if (sources.length) {
+      labels.push({
+        id: "label_affinity_sources",
+        text: `Sources (${sources.length}): ${sources.join(", ")}`,
+        x: startX,
+        y,
+        width: 1400,
+        size: 15,
+        weight: "Regular",
+        color: WF.muted,
+      });
+      y += 50;
+    }
+    Object.entries(KIND_STYLE).forEach(([kind, style], idx) => {
+      shapes.push({
+        id: `shape_key_${kind}`,
+        shapeType: "ROUNDED_RECTANGLE",
+        text: style.label,
+        x: startX + idx * 200,
+        y,
+        width: 180,
+        height: 48,
+        fillColor: style.fill,
+        strokeColor: style.fill,
+      });
+    });
+    y += 110;
+
+    // Takeaways come first: readers want the conclusions before the evidence
+    if (takeaways.length) {
+      labels.push({ id: "label_takeaways", text: "Key takeaways", x: startX, y, width: 600, size: 20, weight: "Semi Bold", color: WF.ink });
+      takeaways.forEach((t, idx) => {
+        stickies.push({
+          id: `sticky_takeaway_${idx}`,
+          text: `⭐ ${t}`,
+          color: "ORANGE",
+          x: startX + idx * (STICKY + COL_GAP),
+          y: y + 50,
+          width: STICKY,
+          height: STICKY,
+        });
+        tsvLines.push(`Takeaway: ${t}`);
+      });
+      tsvLines.push("");
+      y += 50 + STICKY + 160;
+    }
+
+    // Each theme is its own section: insight statement on top, one sticky column per cluster
+    const drawGroup = (
+      gid: string,
+      name: string,
+      insight: string,
+      clusters: Array<{ label: string; notes: any[] }>,
+      x: number
+    ): number => {
+      const memberIds: string[] = [];
+      const width = Math.max(clusters.length * STICKY + (clusters.length - 1) * COL_GAP, 520);
+      labels.push({ id: `label_${gid}_insight`, text: insight, x, y, width, size: 18, weight: "Semi Bold", color: WF.ink });
+      memberIds.push(`label_${gid}_insight`);
+      const allNotes: any[] = [];
+      clusters.forEach((c, cIdx) => {
+        const cx = x + cIdx * (STICKY + COL_GAP);
+        if (c.label) {
+          labels.push({ id: `label_${gid}_c${cIdx}`, text: c.label, x: cx, y: y + 100, width: STICKY, size: 15, weight: "Semi Bold", color: WF.muted });
+          memberIds.push(`label_${gid}_c${cIdx}`);
+        }
+        c.notes.forEach((n, nIdx) => {
+          const id = `sticky_${gid}_c${cIdx}_n${nIdx}`;
+          stickies.push({ id, text: noteText(n), color: noteColor(n), x: cx, y: y + 160, width: STICKY, height: STICKY, column: `${gid}_c${cIdx}` });
+          memberIds.push(id);
+          allNotes.push(n);
+        });
+      });
+      const sourceCount = sourcesOf(allNotes).size;
+      groups.push({
+        id: gid,
+        title: `${name} · ${plural(allNotes.length, "note")}${sourceCount ? `, ${plural(sourceCount, "source")}` : ""}`,
+        memberIds,
+      });
+      return width;
+    };
+
+    let themeX = startX + 60;
+    themes.forEach((t: any, tIdx: number) => {
+      const clusters = t.clusters.map((c: any) => ({ label: str(c.label), notes: asNotes(c.notes) }));
+      const width = drawGroup(`theme${tIdx}`, str(t.name) || `Theme ${tIdx + 1}`, str(t.insight), clusters, themeX);
+      themeX += width + THEME_GAP;
+
+      tsvLines.push(`=== THEME ${tIdx + 1}: ${t.name} ===`);
+      if (t.insight) tsvLines.push(`Insight: ${t.insight}`);
+      clusters.forEach((c: any) => {
+        tsvLines.push(`  ${c.label}`);
+        c.notes.forEach((n: any) => tsvLines.push(`    [${n.kind}] ${n.text}${n.source ? ` (${n.source})` : ""}`));
+      });
+    });
+
+    // Outliers stay visible in a parking lot instead of being forced into a theme
+    if (outliers.length) {
+      drawGroup("outliers", "Parking lot", "Notes that fit no theme yet", [{ label: "", notes: outliers }], themeX);
+      tsvLines.push("=== PARKING LOT ===");
+      outliers.forEach((n: any) => tsvLines.push(`  [${n.kind}] ${n.text}${n.source ? ` (${n.source})` : ""}`));
+    }
   } else {
     // Wireframe: a real device frame with greyscale UI blocks, plus annotation columns
     const layout = data.layoutStructure || {};
@@ -832,6 +997,7 @@ export function generateFigjamCanvasElements(
     sections,
     screens,
     labels,
+    groups,
     tsvData: tsvLines.join("\n"),
     svgData,
   };
@@ -854,6 +1020,7 @@ export function generateFigjamPluginCode(payload: FigjamCanvasPayload): string {
     connectors: payload.connectors,
     screens: payload.screens || [],
     labels: payload.labels || [],
+    groups: payload.groups || [],
   };
 
   return `
@@ -1143,6 +1310,7 @@ for (const l of spec.labels) {
   made.push(t);
   t.x = l.x + offsetX;
   t.y = l.y;
+  byId[l.id] = t;
   placed.push(t);
 }
 
@@ -1191,6 +1359,38 @@ for (const s of spec.stickies) {
   const sticky = byId[s.id];
   if (columnBottom[s.column] !== undefined) sticky.y = columnBottom[s.column] + 24;
   columnBottom[s.column] = sticky.y + sticky.height;
+}
+
+// Wrap each group (e.g. an affinity theme) in its own section, after stacking so it fits the real heights
+const grouped = new Set();
+const groupSections = [];
+for (const g of spec.groups) {
+  const members = g.memberIds.map((id) => byId[id]).filter(Boolean);
+  if (members.length === 0) continue;
+  const gx = Math.min(...members.map((n) => n.x));
+  const gy = Math.min(...members.map((n) => n.y));
+  const gw = Math.max(...members.map((n) => n.x + n.width)) - gx;
+  const gh = Math.max(...members.map((n) => n.y + n.height)) - gy;
+  const gs = figma.createSection();
+  made.push(gs);
+  gs.name = g.title;
+  gs.x = gx - 48;
+  gs.y = gy - 96;
+  gs.resizeWithoutConstraints(gw + 96, gh + 144);
+  for (const m of members) {
+    const absX = m.x;
+    const absY = m.y;
+    gs.appendChild(m);
+    m.x = absX - gs.x;
+    m.y = absY - gs.y;
+    grouped.add(m);
+  }
+  groupSections.push(gs);
+}
+if (groupSections.length) {
+  const loose = placed.filter((n) => !grouped.has(n));
+  placed.length = 0;
+  placed.push(...loose, ...groupSections);
 }
 
 for (const c of spec.connectors) {
@@ -1251,6 +1451,7 @@ return {
   pageName: page.name,
   newPage,
   sectionId: section.id,
+  groups: groupSections.length,
   shapes: spec.shapes.length,
   screens: spec.screens.length,
   stickies: spec.stickies.length,
@@ -1365,6 +1566,25 @@ export function generateMermaidForArtefact(
       }
     });
 
+    return lines.join("\n");
+  }
+
+  if (artefactType === "affinity-map") {
+    const themes = Array.isArray(data.themes) ? data.themes : [];
+    const lines: string[] = ["flowchart TB"];
+    lines.push(`  %% Affinity Map: ${escapeMermaidText(title)}`);
+    themes.forEach((t: any, tIdx: number) => {
+      if (!Array.isArray(t.clusters) || t.clusters.length === 0) return;
+      lines.push(`  subgraph T${tIdx} ["${escapeMermaidText(t.name || `Theme ${tIdx + 1}`)}"]`);
+      (Array.isArray(t.clusters) ? t.clusters : []).forEach((c: any, cIdx: number) => {
+        lines.push(`    T${tIdx}C${cIdx}["${escapeMermaidText(c.label || `Cluster ${cIdx + 1}`)}"]`);
+        (Array.isArray(c.notes) ? c.notes : []).forEach((n: any, nIdx: number) => {
+          lines.push(`    T${tIdx}C${cIdx}N${nIdx}("${escapeMermaidText(n.text)}")`);
+          lines.push(`    T${tIdx}C${cIdx} --- T${tIdx}C${cIdx}N${nIdx}`);
+        });
+      });
+      lines.push(`  end`);
+    });
     return lines.join("\n");
   }
 
@@ -1485,7 +1705,7 @@ export const FIGJAM_MCP_TOOLS = [
   {
     name: "write_figjam_artefact",
     description:
-      "Writes a generated visual artefact (wireframe, user flow, or journey map) to a FigJam board using the Model Context Protocol.",
+      "Writes a generated visual artefact (wireframe, user flow, journey map, or affinity map) to a FigJam board using the Model Context Protocol.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1495,7 +1715,7 @@ export const FIGJAM_MCP_TOOLS = [
         },
         artefactType: {
           type: "string",
-          enum: ["wireframe", "user-journey-map", "user-flow"],
+          enum: ["wireframe", "user-journey-map", "user-flow", "affinity-map"],
           description: "The visual artefact type",
         },
         title: {

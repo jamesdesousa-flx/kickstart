@@ -18,6 +18,7 @@ import {
   UserCheck,
   GitFork,
   Compass,
+  StickyNote,
   Layout,
   ListChecks,
   ChevronDown,
@@ -58,7 +59,10 @@ import {
   pingFigjamMcpServer,
   figmaFileUrl,
   figmaFileUrlFromInput,
+  figmaProductName,
+  getDefaultFigjamBoardUrl,
 } from "../services/figjamMcpService";
+import { FigmaLogo } from "./ProductLogo";
 
 interface UpstreamSourceInfo {
   id: string;
@@ -117,6 +121,11 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
     node.figjamFileId || getDefaultFigjamBoard() || null
   );
   const activeFigjamKey = node.figjamFileId || localConnectedKey;
+  // "Figma" or "FigJam", from the connected file link (falls back to the project's file)
+  const figmaProduct = figmaProductName(
+    node.figjamFileUrl ||
+      (activeFigjamKey && activeFigjamKey === getDefaultFigjamBoard() ? getDefaultFigjamBoardUrl() : null)
+  );
 
   // Default to Google Doc view or FigJam view whenever synced
   const [viewMode, setViewMode] = useState<"google-doc" | "figjam" | "cards">(
@@ -231,7 +240,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
       }
     } catch (err: any) {
       console.error("Error generating visual artefact after FigJam connect:", err);
-      setConnectError(err?.message || "Failed to sync to FigJam board");
+      setConnectError(err?.message || `Failed to sync to ${figmaProductName(boardUrlInput)} file`);
     } finally {
       setIsConnectingBoard(false);
     }
@@ -288,6 +297,12 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
         return {
           label: "User Journey Map",
           icon: <Compass className="w-4 h-4 text-slate-700" />,
+          color: "bg-slate-100 text-slate-700 border-slate-200",
+        };
+      case "affinity-map":
+        return {
+          label: "Affinity Map",
+          icon: <StickyNote className="w-4 h-4 text-slate-700" />,
           color: "bg-slate-100 text-slate-700 border-slate-200",
         };
       case "wireframe":
@@ -540,27 +555,22 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                 <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-[#7B61FF]/10 border border-[#7B61FF]/30 text-[#7B61FF] flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M5.5 8.5C5.5 6.84315 6.84315 5.5 8.5 5.5H12V12H8.5C6.84315 12 5.5 10.6569 5.5 8.5Z" />
-                        <path d="M12 5.5H15.5C17.1569 5.5 18.5 6.84315 18.5 8.5C18.5 10.6569 17.1569 12 12V5.5Z" />
-                        <path d="M5.5 15.5C5.5 13.8431 6.84315 12.5 8.5 12.5H12V19H8.5C6.84315 19 5.5 17.6569 5.5 15.5Z" />
-                        <circle cx="15.5" cy="15.5" r="3.5" />
-                      </svg>
+                      <FigmaLogo className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-bold text-slate-900 truncate">
-                          FigJam Board
+                          {figmaProduct} {figmaProduct === "FigJam" ? "Board" : "File"}
                         </span>
                         <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Live in FigJam
+                          Live in {figmaProduct}
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono px-1 py-0.2 bg-slate-100 rounded">
                           {activeFigjamKey}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 truncate">
-                        Interactive Figma file displayed inline via Model Context Protocol
+                        Interactive {figmaProduct} file displayed inline via Model Context Protocol
                       </p>
                     </div>
                   </div>
@@ -575,18 +585,18 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-1.5 text-xs font-semibold text-[#7B61FF] hover:text-[#684FF2] bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
-                      title="Open file in a Figma tab"
+                      title={`Open file in a ${figmaProduct} tab`}
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open in Figma</span>
+                      <span>Open in {figmaProduct}</span>
                     </a>
 
                     <button
                       onClick={() => setIsEditingBoardUrl(!isEditingBoardUrl)}
                       className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Change connected Figma file"
+                      title={`Change connected ${figmaProduct} file`}
                     >
-                      Change Board
+                      {figmaProduct === "FigJam" ? "Change Board" : "Change File"}
                     </button>
                   </div>
                 </div>
@@ -634,7 +644,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                   />
                   <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
                     <span>
-                      Live Figma file integration • Read & write via Model Context Protocol
+                      Live {figmaProduct} file integration • Read & write via Model Context Protocol
                     </span>
                     <a
                       href={
@@ -645,7 +655,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       rel="noopener noreferrer"
                       className="text-[#7B61FF] hover:underline flex items-center gap-1 font-medium"
                     >
-                      <span>Open in FigJam tab</span>
+                      <span>Open in {figmaProduct} tab</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
@@ -657,17 +667,12 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                 {/* Header */}
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-xl bg-[#7B61FF]/10 border border-[#7B61FF]/30 text-[#7B61FF] flex items-center justify-center shrink-0">
-                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M5.5 8.5C5.5 6.84315 6.84315 5.5 8.5 5.5H12V12H8.5C6.84315 12 5.5 10.6569 5.5 8.5Z" />
-                      <path d="M12 5.5H15.5C17.1569 5.5 18.5 6.84315 18.5 8.5C18.5 10.6569 17.1569 12 12V5.5Z" />
-                      <path d="M5.5 15.5C5.5 13.8431 6.84315 12.5 8.5 12.5H12V19H8.5C6.84315 19 5.5 17.6569 5.5 15.5Z" />
-                      <circle cx="15.5" cy="15.5" r="3.5" />
-                    </svg>
+                    <FigmaLogo className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-base font-bold text-slate-900">
-                        FigJam MCP Connection Required
+                        Figma MCP Connection Required
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                         Figma Not Connected
@@ -732,7 +737,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                 <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900">
-                      Connect FigJam Board to Display Inline
+                      Connect a FigJam or Figma File to Display Inline
                     </span>
                     <a
                       href="https://figjam.new"

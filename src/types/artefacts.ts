@@ -12,6 +12,7 @@ export type ArtefactType =
   | "user-persona"
   | "user-flow"
   | "user-journey-map"
+  | "affinity-map"
   | "wireframe"
   | "survey-questions"
   | "sticky-note";
@@ -170,6 +171,42 @@ export interface UserJourneyMapData {
 }
 
 /* ==========================================================================
+   Affinity Map
+   Notes are grouped bottom-up: note -> cluster -> theme
+   ========================================================================== */
+export type AffinityNoteKind = "insight" | "pain-point" | "finding" | "quote";
+
+export interface AffinityNote {
+  /** One observation per note, short enough to read on a sticky */
+  text: string;
+  kind: AffinityNoteKind;
+  /** Who or what the note came from, e.g. "P3" or "Survey" */
+  source: string;
+}
+
+export interface AffinityCluster {
+  label: string;
+  notes: AffinityNote[];
+}
+
+export interface AffinityTheme {
+  name: string;
+  /** What the theme means, written as a finding rather than a topic */
+  insight: string;
+  clusters: AffinityCluster[];
+}
+
+export interface AffinityMapData {
+  title: string;
+  researchQuestion: string;
+  sources: string[];
+  themes: AffinityTheme[];
+  /** Notes that fit no theme yet; kept so weak signals are not lost */
+  outliers: AffinityNote[];
+  keyTakeaways: string[];
+}
+
+/* ==========================================================================
    Wireframe
    ========================================================================== */
 export interface WireframeSectionItem {
@@ -260,6 +297,7 @@ export type GeneratedArtefactPayload =
   | { type: "user-persona"; data: UserPersonaData }
   | { type: "user-flow"; data: UserFlowData }
   | { type: "user-journey-map"; data: UserJourneyMapData }
+  | { type: "affinity-map"; data: AffinityMapData }
   | { type: "wireframe"; data: WireframeData }
   | { type: "survey-questions"; data: SurveyQuestionsData };
 
@@ -311,7 +349,8 @@ export function isVisualFigjamArtefact(type: ArtefactType): boolean {
   return (
     type === "wireframe" ||
     type === "user-journey-map" ||
-    type === "user-flow"
+    type === "user-flow" ||
+    type === "affinity-map"
   );
 }
 
@@ -441,6 +480,18 @@ export const ARTEFACT_LIBRARY_ITEMS: ArtefactLibraryItem[] = [
     accentBorder: "border-slate-200",
     accentText: "text-slate-700",
     defaultTitle: "Customer Journey Map",
+  },
+  {
+    type: "affinity-map",
+    name: "Affinity Map",
+    badge: "Synthesis",
+    category: "Output",
+    description: "Turn research notes into insight, pain point, finding and quote stickies grouped into themes.",
+    color: "slate",
+    accentBg: "bg-slate-100",
+    accentBorder: "border-slate-200",
+    accentText: "text-slate-700",
+    defaultTitle: "Research Affinity Map",
   },
   {
     type: "wireframe",

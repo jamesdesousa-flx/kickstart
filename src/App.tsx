@@ -93,7 +93,7 @@ function SignedInApp({ userEmail }: { userEmail: string }) {
         if (!project) throw new Error("This project does not exist or you do not have access to it.");
         const canvas = await loadProjectCanvas(project.id);
         if (cancelled) return;
-        setActiveProjectFigjamBoard(project.figjamFileKey);
+        setActiveProjectFigjamBoard(project.figjamFileUrl || project.figjamFileKey);
         setOpenProject({ project, canvas });
       } catch (err: any) {
         if (!cancelled) setLoadError(err?.message || "Could not open the project.");

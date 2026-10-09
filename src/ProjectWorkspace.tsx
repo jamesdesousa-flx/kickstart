@@ -43,7 +43,9 @@ import {
   checkFigjamBridgeStatus,
   getDefaultFigjamBoard,
   figmaFileUrl,
+  figmaProductName,
 } from "./services/figjamMcpService";
+import { FigmaLogo } from "./components/ProductLogo";
 import { Project, ProjectCanvasSaver } from "./services/projectsService";
 import { apiFetch } from "./services/authService";
 import {
@@ -81,6 +83,9 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isSigningInGoogle, setIsSigningInGoogle] = useState<boolean>(false);
   const [isCreatingGoogleDoc, setIsCreatingGoogleDoc] = useState<boolean>(false);
+
+  // "Figma" or "FigJam", from the project's file link
+  const projectFigmaProduct = figmaProductName(project.figjamFileUrl);
 
   // FigJam MCP Connection State
   const [isFigjamModalOpen, setIsFigjamModalOpen] = useState<boolean>(false);
@@ -449,7 +454,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           });
           showNotification(figjamResult.summaryText);
         } catch (err: any) {
-          showNotification(`FigJam error: ${err?.message || "Failed to draw the artefact"}`);
+          showNotification(`${projectFigmaProduct} error: ${err?.message || "Failed to draw the artefact"}`);
         } finally {
           setIsSyncingFigjam(false);
         }
@@ -489,13 +494,13 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         figjamCreatedAt: new Date().toISOString(),
         error: null,
       });
-      showNotification("Figma file connected & displayed inline! Connect inputs on canvas to generate specifications.");
+      showNotification(`${projectFigmaProduct} file connected & displayed inline! Connect inputs on canvas to generate specifications.`);
       return;
     }
 
     setIsSyncingFigjam(true);
     try {
-      showNotification(`Synchronizing ${targetNode.title} with FigJam via MCP...`);
+      showNotification(`Synchronizing ${targetNode.title} with ${projectFigmaProduct} via MCP...`);
       const figjamResult = await generateFigjamArtefactViaMcp({
         title: targetNode.title,
         type: targetNode.type,
@@ -520,7 +525,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
     } catch (err: any) {
       console.error("Failed to sync FigJam board via MCP:", err);
       showNotification(
-        `FigJam MCP error: ${err?.message || "Failed to sync board"}`
+        `${projectFigmaProduct} MCP error: ${err?.message || "Failed to sync board"}`
       );
     } finally {
       setIsSyncingFigjam(false);
@@ -620,7 +625,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       let figjamError: string | null = null;
       if (isVisualFigjamArtefact(targetNode.type)) {
         try {
-          showNotification(`Drawing ${targetNode.title} in Figma...`);
+          showNotification(`Drawing ${targetNode.title} in ${projectFigmaProduct}...`);
           // Draw into the FigJam file the Desktop Bridge plugin is open in, unless a file was chosen explicitly
           const figjamResult = await generateFigjamArtefactViaMcp({
             title: targetNode.title,
@@ -638,7 +643,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           showNotification(figjamResult.summaryText);
         } catch (figjamErr: any) {
           console.error("Failed to draw artefact in FigJam:", figjamErr);
-          figjamError = figjamErr?.message || "Failed to draw the artefact in FigJam.";
+          figjamError = figjamErr?.message || `Failed to draw the artefact in ${projectFigmaProduct}.`;
         }
       }
 
@@ -662,7 +667,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       });
 
       if (figjamError) {
-        showNotification(`FigJam error: ${figjamError}`);
+        showNotification(`${projectFigmaProduct} error: ${figjamError}`);
         setActiveDetailNodeId(nodeId);
       } else if (isVisualFigjamArtefact(targetNode.type)) {
         // Success message was already shown with the FigJam draw summary
@@ -800,31 +805,24 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
             </button>
           )}
 
-          {/* FigJam MCP Connection Status & Config Button */}
+          {/* Figma / FigJam MCP Connection Status & Config Button */}
           <a
             href={project.figjamFileUrl}
             target="_blank"
             rel="noreferrer"
             className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
-            title="Open this project's Figma file"
+            title={`Open this project's ${projectFigmaProduct} file`}
           >
-            Project Figma file
+            Project {projectFigmaProduct} file
           </a>
 
           <button
             onClick={() => setIsFigjamModalOpen(true)}
             className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-colors"
-            title="FigJam MCP Connection (Model Context Protocol)"
+            title={`${projectFigmaProduct} MCP Connection (Model Context Protocol)`}
           >
-            <div className="w-3.5 h-3.5 text-[#7B61FF]">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M5.5 8.5C5.5 6.84315 6.84315 5.5 8.5 5.5H12V12H8.5C6.84315 12 5.5 10.6569 5.5 8.5Z" />
-                <path d="M12 5.5H15.5C17.1569 5.5 18.5 6.84315 18.5 8.5C18.5 10.6569 17.1569 12 15.5 12H12V5.5Z" />
-                <path d="M5.5 15.5C5.5 13.8431 6.84315 12.5 8.5 12.5H12V19H8.5C6.84315 19 5.5 17.6569 5.5 15.5Z" />
-                <circle cx="15.5" cy="15.5" r="3.5" />
-              </svg>
-            </div>
-            <span>FigJam MCP</span>
+            <FigmaLogo className="w-3.5 h-3.5" />
+            <span>{projectFigmaProduct} MCP</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
           </button>
 

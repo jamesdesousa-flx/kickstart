@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { FigmaLogo } from "./ProductLogo";
+import { figmaProductName } from "../services/figjamMcpService";
 import {
   ZoomIn,
   ZoomOut,
@@ -21,6 +23,7 @@ import {
   UserCheck,
   GitFork,
   Compass,
+  StickyNote,
   Layout,
   ListChecks,
   Layers,
@@ -1141,6 +1144,8 @@ const GenerativeArtefactCard: React.FC<GenerativeArtefactCardProps> = ({
         return <GitFork className="w-3.5 h-3.5 text-slate-700" />;
       case "user-journey-map":
         return <Compass className="w-3.5 h-3.5 text-slate-700" />;
+      case "affinity-map":
+        return <StickyNote className="w-3.5 h-3.5 text-slate-700" />;
       case "wireframe":
         return <Layout className="w-3.5 h-3.5 text-slate-700" />;
       case "survey-questions":
@@ -1279,13 +1284,8 @@ const GenerativeArtefactCard: React.FC<GenerativeArtefactCardProps> = ({
             )}
             {node.figjamFileId && (
               <span className="ml-1.5 px-1.5 py-0.2 rounded bg-purple-50 text-[#7B61FF] border border-purple-200 text-[10px] font-semibold inline-flex items-center gap-1">
-                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5.5 8.5C5.5 6.84315 6.84315 5.5 8.5 5.5H12V12H8.5C6.84315 12 5.5 10.6569 5.5 8.5Z" />
-                  <path d="M12 5.5H15.5C17.1569 5.5 18.5 6.84315 18.5 8.5C18.5 10.6569 17.1569 12 15.5 12H12V5.5Z" />
-                  <path d="M5.5 15.5C5.5 13.8431 6.84315 12.5 8.5 12.5H12V19H8.5C6.84315 19 5.5 17.6569 5.5 15.5Z" />
-                  <circle cx="15.5" cy="15.5" r="3.5" />
-                </svg>
-                <span>FigJam</span>
+                <FigmaLogo className="w-2.5 h-2.5" />
+                <span>{figmaProductName(node.figjamFileUrl)}</span>
               </span>
             )}
             {node.error && (

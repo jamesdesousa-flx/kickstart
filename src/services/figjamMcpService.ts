@@ -94,15 +94,29 @@ export function figmaFileUrlFromInput(input?: string): string | null {
   return key ? figmaFileUrl(key, figmaEditorTypeFromUrl(input)) : null;
 }
 
+/**
+ * The product name to show for a file link: "FigJam" for a /board/ link, "Figma" for anything else
+ */
+export function figmaProductName(fileUrl?: string | null): "Figma" | "FigJam" {
+  return figmaEditorTypeFromUrl(fileUrl || undefined) === "figjam" ? "FigJam" : "Figma";
+}
+
 // The Figma file (FigJam or Design) of the open project. Every visual artefact in a project draws into this file.
 let activeProjectFigjamKey = "";
+let activeProjectFigjamUrl = "";
 
 export function getDefaultFigjamBoard(): string {
   return activeProjectFigjamKey;
 }
 
+// The link of the open project's file, when it was set from a link
+export function getDefaultFigjamBoardUrl(): string {
+  return activeProjectFigjamUrl;
+}
+
 export function setActiveProjectFigjamBoard(keyOrUrl: string) {
   activeProjectFigjamKey = extractFigmaFileKey(keyOrUrl) || keyOrUrl.trim();
+  activeProjectFigjamUrl = figmaEditorTypeFromUrl(keyOrUrl) ? keyOrUrl.trim() : "";
 }
 
 export function getFigmaToken(): string {

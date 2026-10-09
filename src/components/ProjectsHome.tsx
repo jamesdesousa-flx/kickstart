@@ -220,7 +220,7 @@ const NewProjectModal: React.FC<{
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 select-text"
         />
         <p className="text-[11px] text-slate-500 mt-1.5 mb-4 leading-relaxed">
-          Wireframes, flows and journey maps for this project are drawn into this file. Projects can share a
+          Wireframes, flows, journey maps and affinity maps for this project are drawn into this file. Projects can share a
           file. No file yet?{" "}
           <a href="https://figjam.new" target="_blank" rel="noreferrer" className="underline text-slate-700">
             Create one in FigJam

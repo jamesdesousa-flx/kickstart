@@ -13,6 +13,7 @@ import {
   UserCheck,
   GitFork,
   Compass,
+  StickyNote,
   Layout,
   ListChecks,
   GripVertical,
@@ -64,6 +65,8 @@ export const ArtefactLibraryPanel: React.FC<ArtefactLibraryPanelProps> = ({
         return <GitFork className="w-4 h-4 text-slate-700" />;
       case "user-journey-map":
         return <Compass className="w-4 h-4 text-slate-700" />;
+      case "affinity-map":
+        return <StickyNote className="w-4 h-4 text-slate-700" />;
       case "wireframe":
         return <Layout className="w-4 h-4 text-slate-700" />;
       case "survey-questions":

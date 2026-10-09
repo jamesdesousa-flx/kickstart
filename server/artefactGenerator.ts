@@ -78,7 +78,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 // ============================================================================
-// Schemas for the 7 Artefact Types
+// Schemas for the 8 Artefact Types
 // ============================================================================
 
 export const interviewScriptSchema = {
@@ -362,6 +362,65 @@ export const userJourneyMapSchema = {
 /** "One of: name (when to use); ..." built from a layout catalog */
 const oneOf = (catalog: Record<string, string>) =>
   "One of: " + Object.entries(catalog).map(([name, use]) => `${name} (${use})`).join("; ");
+
+const affinityNoteSchema = {
+  type: Type.OBJECT,
+  properties: {
+    text: { type: Type.STRING },
+    kind: {
+      type: Type.STRING,
+      enum: ["insight", "pain-point", "finding", "quote"],
+    },
+    source: { type: Type.STRING },
+  },
+  required: ["text", "kind", "source"],
+};
+
+export const affinityMapSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    researchQuestion: { type: Type.STRING },
+    sources: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    themes: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          insight: { type: Type.STRING },
+          clusters: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                label: { type: Type.STRING },
+                notes: {
+                  type: Type.ARRAY,
+                  items: affinityNoteSchema,
+                },
+              },
+              required: ["label", "notes"],
+            },
+          },
+        },
+        required: ["name", "insight", "clusters"],
+      },
+    },
+    outliers: {
+      type: Type.ARRAY,
+      items: affinityNoteSchema,
+    },
+    keyTakeaways: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+  },
+  required: ["title", "researchQuestion", "sources", "themes", "outliers", "keyTakeaways"],
+};
 
 export const wireframeSchema = {
   type: Type.OBJECT,
@@ -950,6 +1009,81 @@ function synthesizeFallbackUserJourneyMap(title: string, summary: string): any {
   };
 }
 
+function synthesizeFallbackAffinityMap(title: string, summary: string): any {
+  return {
+    title: title || "Research Affinity Map",
+    researchQuestion: `What gets in the way of users today? Context: ${summary.slice(0, 140)}...`,
+    sources: ["P1", "P2", "P3", "P4", "P5"],
+    themes: [
+      {
+        name: "Setup feels risky",
+        insight: "Users delay setup because they cannot predict what the tool will change.",
+        clusters: [
+          {
+            label: "Unclear first step",
+            notes: [
+              { text: "Did not know which block to add first on the empty canvas", kind: "pain-point", source: "P1" },
+              { text: "\"I just stared at it for a minute, then closed the tab.\"", kind: "quote", source: "P3" },
+              { text: "3 of 5 participants opened the help page before acting", kind: "finding", source: "P1, P3, P4" },
+            ],
+          },
+          {
+            label: "Fear of breaking things",
+            notes: [
+              { text: "Worried that connecting a data source would overwrite team files", kind: "pain-point", source: "P2" },
+              { text: "Asked for a preview before any change is saved", kind: "finding", source: "P5" },
+              { text: "Trust grows when users can undo safely", kind: "insight", source: "P2, P5" },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Work is rebuilt by hand",
+        insight: "Users copy the same content between tools because outputs do not travel.",
+        clusters: [
+          {
+            label: "Copy and paste between tools",
+            notes: [
+              { text: "Pastes findings from notes into slides, then into the backlog", kind: "finding", source: "P4" },
+              { text: "\"Half my week is moving text from one place to another.\"", kind: "quote", source: "P2" },
+              { text: "Formatting is lost on every paste", kind: "pain-point", source: "P1" },
+            ],
+          },
+          {
+            label: "Version confusion",
+            notes: [
+              { text: "Stakeholders comment on old copies of the report", kind: "pain-point", source: "P3" },
+              { text: "One shared source would remove most rework", kind: "insight", source: "P3, P4" },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Sharing needs a story",
+        insight: "Stakeholders act on findings only when they see the evidence behind them.",
+        clusters: [
+          {
+            label: "Evidence wins arguments",
+            notes: [
+              { text: "Clips and quotes convinced the PM more than the summary", kind: "finding", source: "P5" },
+              { text: "\"Show me who said it, or it is just your opinion.\"", kind: "quote", source: "P4" },
+              { text: "Link each insight to its raw notes", kind: "insight", source: "P4, P5" },
+            ],
+          },
+        ],
+      },
+    ],
+    outliers: [
+      { text: "Wants a dark mode for late-night synthesis", kind: "finding", source: "P1" },
+    ],
+    keyTakeaways: [
+      "Reduce setup risk with previews and undo before asking users to connect data.",
+      "Make outputs travel between tools so findings are not rebuilt by hand.",
+      "Keep the evidence (quotes, sources) attached to every insight that gets shared.",
+    ],
+  };
+}
+
 /** Device the user named in the title or guidance, e.g. "Focus on mobile" */
 function requestedScreenType(text: string): "mobile" | "tablet" | "web-desktop" | null {
   const t = text.toLowerCase();
@@ -1249,6 +1383,21 @@ export async function generateArtefact(params: {
       promptSpecifics = `Generate a Customer Journey Map titled "${nodeTitle || "User Journey Map"}". Define 4 to 5 chronological phases reflecting the user journey in the upstream context.`;
       break;
 
+    case "affinity-map":
+      schema = affinityMapSchema;
+      systemInstruction = `You are a Principal UX Researcher who synthesises qualitative research with affinity mapping. You follow these rules:
+- Work bottom-up. Read every source first, then let themes emerge from the notes. Never start from preset categories such as "Usability" or "Features".
+- One note is one atomic observation, at most 20 words, short enough for a sticky note. Never put two ideas on one note.
+- Stay true to the data. Quotes are verbatim and in double quotes. Never invent participants, numbers or quotes that the sources do not support.
+- Tag every note with its source (participant ID such as "P3", document name, or "Survey"). Use the IDs the sources already use.
+- Each note has a kind: "finding" (what was observed or said), "pain-point" (friction, frustration or failure), "quote" (verbatim words), or "insight" (an interpretation of why, built on several notes).
+- Group notes into clusters of 2 to 6 notes. Give each cluster a short label of 2 to 6 words.
+- Group clusters into themes. The theme name is 2 to 6 words. The theme insight is one sentence that states what the data means (for example "Users delay setup because they cannot predict what will change"), never a topic label.
+- Do not force notes into a theme. Put notes that fit nowhere in "outliers".
+- Order themes by how many sources support them, strongest first.`;
+      promptSpecifics = `Generate an Affinity Map titled "${nodeTitle || "Research Affinity Map"}". Extract notes from the research in the upstream context (transcripts, notes, survey results). Aim for 4 to 6 themes, each with 1 to 3 clusters. Set researchQuestion to the question the research answers. List every participant or source in "sources". Write 3 to 5 keyTakeaways as actionable statements for the product team.`;
+      break;
+
     case "wireframe": {
       schema = wireframeSchema;
       const device = requestedScreenType(`${nodeTitle} ${customGuidance}`);
@@ -1338,6 +1487,8 @@ Produce an exhaustive, highly practical, and context-tailored JSON output adheri
       return synthesizeFallbackUserFlow(nodeTitle, summary);
     case "user-journey-map":
       return synthesizeFallbackUserJourneyMap(nodeTitle, summary);
+    case "affinity-map":
+      return synthesizeFallbackAffinityMap(nodeTitle, summary);
     case "wireframe":
       return {
         ...synthesizeFallbackWireframe(nodeTitle, summary),
