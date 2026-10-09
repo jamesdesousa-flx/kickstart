@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Plus, FolderOpen, Trash2, X, ExternalLink, Loader2, AlertCircle, LogOut } from "lucide-react";
+import { KickstartMark } from "./KickstartMark";
 import {
   Project,
   ProjectSummary,
@@ -61,7 +62,8 @@ export const ProjectsHome: React.FC<ProjectsHomeProps> = ({ userEmail, onSignOut
   return (
     <div className="min-h-screen w-screen bg-slate-50 font-sans text-slate-900">
       <header className="h-12 px-4 bg-white border-b border-slate-200 flex items-center">
-        <span className="text-sm font-semibold tracking-tight text-slate-900">Kickstart</span>
+        <KickstartMark />
+        <span className="ml-2 text-sm font-semibold tracking-tight text-slate-900">Kickstart</span>
         <span className="ml-auto text-xs text-slate-500 truncate">{userEmail}</span>
         <button
           onClick={onSignOut}

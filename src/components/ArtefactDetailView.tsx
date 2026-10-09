@@ -116,7 +116,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
       (activeFigjamKey && activeFigjamKey === getDefaultFigjamBoard() ? getDefaultFigjamBoardUrl() : null)
   );
 
-  const [embedMode, setEmbedMode] = useState<"edit" | "preview">("edit");
+  const [embedMode, setEmbedMode] = useState<"edit" | "preview">("preview");
   const [boardUrlInput, setBoardUrlInput] = useState(
     node.figjamFileUrl || node.figjamFileId || localConnectedKey || ""
   );
@@ -440,70 +440,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
               ))}
             </div>
           )}
-        </div>
-
-        {/* Generation Action & Custom Prompt Strip */}
-        <div className="p-3.5 sm:px-5 bg-white border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          <div className="flex-1">
-            <input
-              type="text"
-              value={customGuidance}
-              onChange={(e) => setCustomGuidance(e.target.value)}
-              placeholder="Variation instructions (e.g. 'Target senior users', 'Focus on mobile')..."
-              className="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white transition-all"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => onGenerate(node.id, customGuidance)}
-              disabled={isGenerating || upstreamSources.length === 0}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border ${
-                upstreamSources.length === 0
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : "bg-slate-900 hover:bg-slate-800 text-white border-slate-900 cursor-pointer"
-              }`}
-              title={
-                upstreamSources.length === 0
-                  ? "Connect at least one input block on canvas to generate"
-                  : undefined
-              }
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                  <span>Generating...</span>
-                </>
-              ) : hasData ? (
-                <span>Re-generate</span>
-              ) : (
-                <span>Generate</span>
-              )}
-            </button>
-
-            {hasData && (
-              <>
-                <button
-                  onClick={handleCopyMarkdown}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-md text-xs transition-colors"
-                  title="Copy JSON / Markdown"
-                >
-                  {copiedMarkdown ? (
-                    <Check className="w-3.5 h-3.5 text-slate-900" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                </button>
-                <button
-                  onClick={handleDownloadJSON}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-md text-xs transition-colors"
-                  title="Download JSON"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
-          </div>
         </div>
 
         {/* Content Body */}
@@ -917,6 +853,70 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
               )}
             </>
           )}
+        </div>
+
+        {/* Generation Action & Custom Prompt Strip */}
+        <div className="p-3.5 sm:px-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={customGuidance}
+              onChange={(e) => setCustomGuidance(e.target.value)}
+              placeholder="Variation instructions (e.g. 'Target senior users', 'Focus on mobile')..."
+              className="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 focus:bg-white transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => onGenerate(node.id, customGuidance)}
+              disabled={isGenerating || upstreamSources.length === 0}
+              className={`px-3.5 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border ${
+                upstreamSources.length === 0
+                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                  : "bg-slate-900 hover:bg-slate-800 text-white border-slate-900 cursor-pointer"
+              }`}
+              title={
+                upstreamSources.length === 0
+                  ? "Connect at least one input block on canvas to generate"
+                  : undefined
+              }
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <span>Generating...</span>
+                </>
+              ) : hasData ? (
+                <span>Re-generate</span>
+              ) : (
+                <span>Generate</span>
+              )}
+            </button>
+
+            {hasData && (
+              <>
+                <button
+                  onClick={handleCopyMarkdown}
+                  className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-md text-xs transition-colors"
+                  title="Copy JSON / Markdown"
+                >
+                  {copiedMarkdown ? (
+                    <Check className="w-3.5 h-3.5 text-slate-900" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                <button
+                  onClick={handleDownloadJSON}
+                  className="p-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-md text-xs transition-colors"
+                  title="Download JSON"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

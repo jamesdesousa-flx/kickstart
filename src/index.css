@@ -5,6 +5,7 @@
     --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-serif: 'Instrument Serif', Georgia, serif;
     --font-mono: 'JetBrains Mono', monospace;
+    --font-logo: 'Alien Block', sans-serif;
   }
 
   body {
@@ -22,6 +23,10 @@
 
 .font-sans {
   font-family: var(--font-sans);
+}
+
+.font-logo {
+  font-family: var(--font-logo);
 }
 
 .font-mono {

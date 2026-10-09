@@ -61,6 +61,7 @@ import { ArtefactLibraryPanel } from "./components/ArtefactLibraryPanel";
 import { CanvasWorkspace } from "./components/CanvasWorkspace";
 import { ArtefactDetailView } from "./components/ArtefactDetailView";
 import { FigjamMcpModal } from "./components/FigjamMcpModal";
+import { KickstartMark } from "./components/KickstartMark";
 
 interface ProjectWorkspaceProps {
   project: Project;
@@ -753,6 +754,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
+          <KickstartMark />
           <span className="text-sm font-semibold tracking-tight text-slate-400">Kickstart</span>
           <span className="text-sm text-slate-300">/</span>
           <span className="text-sm font-semibold tracking-tight text-slate-900 truncate max-w-[240px]">
