@@ -13,6 +13,7 @@ export type ArtefactType =
   | "user-flow"
   | "user-journey-map"
   | "affinity-map"
+  | "research-report"
   | "wireframe"
   | "survey-questions"
   | "sticky-note";
@@ -207,6 +208,71 @@ export interface AffinityMapData {
 }
 
 /* ==========================================================================
+   Research Report
+   A UX findings doc: conclusions first, then evidence, then detail
+   ========================================================================== */
+export type ResearchFindingSeverity = "critical" | "high" | "medium" | "low";
+
+export type ResearchRecommendationPriority = "now" | "next" | "later";
+
+export interface ResearchEvidence {
+  /** Verbatim words from a source */
+  quote: string;
+  /** Participant ID or document name, e.g. "P3" */
+  source: string;
+}
+
+export interface ResearchFinding {
+  /** Stable reference such as "F1", used by recommendations */
+  id: string;
+  /** The finding as a full sentence, not a topic label */
+  headline: string;
+  /** What was observed and why it matters */
+  detail: string;
+  severity: ResearchFindingSeverity;
+  /** How many sources support it, as a count, e.g. "4 of 6 participants" */
+  frequency: string;
+  evidence: ResearchEvidence[];
+}
+
+export interface ResearchTheme {
+  name: string;
+  /** What the theme means, written as a finding rather than a topic */
+  insight: string;
+  findings: ResearchFinding[];
+}
+
+export interface ResearchRecommendation {
+  action: string;
+  rationale: string;
+  priority: ResearchRecommendationPriority;
+  /** Finding IDs this recommendation addresses */
+  relatedFindings: string[];
+}
+
+export interface ResearchReportData {
+  title: string;
+  /** 2 to 4 sentences: what we learned and what to do about it */
+  executiveSummary: string;
+  keyTakeaways: string[];
+  /** Why the research was done and which decision it informs */
+  background: string;
+  researchQuestions: string[];
+  methodology: {
+    methods: string;
+    participants: string;
+    timeframe: string;
+  };
+  themes: ResearchTheme[];
+  /** Positive findings to keep when the product changes */
+  whatWorked: string[];
+  recommendations: ResearchRecommendation[];
+  limitations: string[];
+  nextSteps: string[];
+  participants: Array<{ id: string; profile: string }>;
+}
+
+/* ==========================================================================
    Wireframe
    ========================================================================== */
 export interface WireframeSectionItem {
@@ -298,6 +364,7 @@ export type GeneratedArtefactPayload =
   | { type: "user-flow"; data: UserFlowData }
   | { type: "user-journey-map"; data: UserJourneyMapData }
   | { type: "affinity-map"; data: AffinityMapData }
+  | { type: "research-report"; data: ResearchReportData }
   | { type: "wireframe"; data: WireframeData }
   | { type: "survey-questions"; data: SurveyQuestionsData };
 
@@ -493,6 +560,18 @@ export const ARTEFACT_LIBRARY_ITEMS: ArtefactLibraryItem[] = [
     accentBorder: "border-slate-200",
     accentText: "text-slate-700",
     defaultTitle: "Research Affinity Map",
+  },
+  {
+    type: "research-report",
+    name: "Research Report",
+    badge: "Synthesis",
+    category: "Output",
+    description: "Summarise research into a UX findings doc with prioritised findings, evidence and recommendations.",
+    color: "slate",
+    accentBg: "bg-slate-100",
+    accentBorder: "border-slate-200",
+    accentText: "text-slate-700",
+    defaultTitle: "UX Research Report",
   },
   {
     type: "wireframe",

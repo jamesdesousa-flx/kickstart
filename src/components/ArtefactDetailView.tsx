@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from "react";
 import {
   X,
-  Sparkles,
   Copy,
   Check,
   Download,
@@ -19,12 +18,9 @@ import {
   GitFork,
   Compass,
   StickyNote,
+  NotebookText,
   Layout,
   ListChecks,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  ArrowRight,
   ExternalLink,
   Laptop,
   Smartphone,
@@ -35,23 +31,17 @@ import {
   Smile,
   Meh,
   Frown,
-  Activity,
   Settings,
 } from "lucide-react";
 import {
   CanvasNode,
   ArtefactType,
-  InterviewScriptData,
-  UsabilityScriptData,
-  UserPersonaData,
   UserFlowData,
   UserJourneyMapData,
   WireframeData,
-  SurveyQuestionsData,
   isVisualFigjamArtefact,
 } from "../types/artefacts";
 import type { GoogleUser } from "../services/googleAuth";
-import { isTextBasedArtefact } from "../services/googleDocsService";
 import {
   extractFigmaFileKey,
   readFigjamBoardViaMcp,
@@ -114,7 +104,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
   // Always derive generation state from the specific node, so detail views of different blocks never collide
   const isGenerating = Boolean(node.isGenerating ?? propIsGenerating);
   const [customGuidance, setCustomGuidance] = useState(node.customGuidance || "");
-  const isTextDoc = isTextBasedArtefact(node.type);
   const isVisualFigjam = isVisualFigjamArtefact(node.type);
 
   const [localConnectedKey, setLocalConnectedKey] = useState<string | null>(
@@ -127,14 +116,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
       (activeFigjamKey && activeFigjamKey === getDefaultFigjamBoard() ? getDefaultFigjamBoardUrl() : null)
   );
 
-  // Default to Google Doc view or FigJam view whenever synced
-  const [viewMode, setViewMode] = useState<"google-doc" | "figjam" | "cards">(
-    isTextDoc && node.googleDocId
-      ? "google-doc"
-      : isVisualFigjam && activeFigjamKey
-      ? "figjam"
-      : "cards"
-  );
   const [embedMode, setEmbedMode] = useState<"edit" | "preview">("edit");
   const [boardUrlInput, setBoardUrlInput] = useState(
     node.figjamFileUrl || node.figjamFileId || localConnectedKey || ""
@@ -166,14 +147,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
     }
     setBoardUrlInput(node.figjamFileUrl || node.figjamFileId || initialKey || "");
   }, [node.id, node.customGuidance, node.figjamFileUrl, node.figjamFileId]);
-
-  useEffect(() => {
-    if (isTextDoc && node.googleDocId) {
-      setViewMode("google-doc");
-    } else if (isVisualFigjam && (node.figjamFileId || localConnectedKey)) {
-      setViewMode("figjam");
-    }
-  }, [node.id, node.googleDocId, node.figjamFileId, localConnectedKey, isTextDoc, isVisualFigjam]);
 
   const [copiedFigjam, setCopiedFigjam] = useState(false);
 
@@ -222,7 +195,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
       setLocalConnectedKey(key);
       setBoardUrlInput(fileUrl);
       setIsEditingBoardUrl(false);
-      setViewMode("figjam");
 
       onUpdateNode?.(node.id, {
         figjamFileId: key,
@@ -303,6 +275,12 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
         return {
           label: "Affinity Map",
           icon: <StickyNote className="w-4 h-4 text-slate-700" />,
+          color: "bg-slate-100 text-slate-700 border-slate-200",
+        };
+      case "research-report":
+        return {
+          label: "Research Report",
+          icon: <NotebookText className="w-4 h-4 text-slate-700" />,
           color: "bg-slate-100 text-slate-700 border-slate-200",
         };
       case "wireframe":
@@ -831,7 +809,7 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
               {hasData && !isGenerating && (
                 <div className="space-y-4">
                   {/* Google Doc embed if enabled */}
-                  {isTextDoc && node.googleDocId && viewMode === "google-doc" ? (
+                  {node.googleDocId ? (
                     <div className="flex flex-col space-y-3 animate-in fade-in duration-150">
                       {/* Embedded Google Doc Toolbar */}
                       <div className="p-3 bg-white border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
@@ -878,13 +856,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                             <span>Open in Docs</span>
                           </a>
 
-                          <button
-                            onClick={() => setViewMode("cards")}
-                            className="px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 transition-colors"
-                          >
-                            Cards View
-                          </button>
-
                           {onCreateGoogleDoc && (
                             <button
                               onClick={() => onCreateGoogleDoc(node.id)}
@@ -908,73 +879,39 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <>
-                      {/* Google Doc Prompt banner if available */}
-                      {isTextDoc && (
-                        <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                                <path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" />
-                                <path fill="#ffffff" d="M14 2v6h6" opacity="0.4" />
-                                <path fill="#ffffff" d="M8 12h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
-                              </svg>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-slate-900">
-                                {node.googleDocId ? "Google Doc Available" : "Google Doc Integration"}
-                              </p>
-                              <p className="text-[11px] text-slate-500">
-                                {node.googleDocId ? "This artefact is synced to Google Drive." : "Create a live Google Doc to view and edit this artefact inline."}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {node.googleDocId ? (
-                              <button
-                                onClick={() => setViewMode("google-doc")}
-                                className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1"
-                              >
-                                <FileText className="w-3 h-3" />
-                                <span>Switch to Embedded Doc</span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => onCreateGoogleDoc?.(node.id)}
-                                disabled={isCreatingGoogleDoc}
-                                className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1"
-                              >
-                                {isCreatingGoogleDoc ? (
-                                  <>
-                                    <RefreshCw className="w-3 h-3 animate-spin" />
-                                    <span>Creating Doc...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>Create Google Doc</span>
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Render text-based artifacts */}
-                      {node.type === "interview-script" && (
-                        <RenderInterviewScript data={node.generatedData?.data as InterviewScriptData} />
-                      )}
-                      {node.type === "usability-script" && (
-                        <RenderUsabilityScript data={node.generatedData?.data as UsabilityScriptData} />
-                      )}
-                      {node.type === "user-persona" && (
-                        <RenderUserPersona data={node.generatedData?.data as UserPersonaData} />
-                      )}
-                      {node.type === "survey-questions" && (
-                        <RenderSurveyQuestions data={node.generatedData?.data as SurveyQuestionsData} />
-                      )}
-                    </>
+                    /* Text artefacts are only ever shown as an embedded Google Doc */
+                    <div className="min-h-[300px] flex flex-col items-center justify-center text-center p-6 bg-white border border-slate-200 rounded-xl">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center mb-2.5">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" />
+                          <path fill="#ffffff" d="M14 2v6h6" opacity="0.4" />
+                          <path fill="#ffffff" d="M8 12h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                        Google Doc not created yet
+                      </h3>
+                      <p className="text-xs text-slate-500 max-w-sm mb-4 leading-relaxed">
+                        {badgeInfo.label} content is only shown as a Google Doc. Create the doc in your Google Drive to view and edit it here.
+                      </p>
+                      <button
+                        onClick={() => onCreateGoogleDoc?.(node.id)}
+                        disabled={isCreatingGoogleDoc}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5"
+                      >
+                        {isCreatingGoogleDoc ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Creating Doc...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Create Google Doc</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -989,378 +926,6 @@ export const ArtefactDetailView: React.FC<ArtefactDetailViewProps> = ({
 /* ==========================================================================
    Renderers for each Artefact Type
    ========================================================================== */
-
-function RenderInterviewScript({ data }: { data: InterviewScriptData }) {
-  if (!data) return null;
-  return (
-    <div className="space-y-5">
-      {/* Overview & Audience Card */}
-      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3">
-        <div>
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-            Research Objective
-          </h4>
-          <p className="text-sm font-medium text-slate-800">{data.overview}</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-          <div>
-            <h5 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Target Audience
-            </h5>
-            <p className="text-xs text-slate-700">{data.targetAudience}</p>
-          </div>
-          <div>
-            <h5 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Screener Criteria
-            </h5>
-            <ul className="text-xs text-slate-700 space-y-1">
-              {data.screenerCriteria?.map((crit, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>{crit}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Intro Script */}
-      <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl">
-        <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-          <MessageSquareQuote className="w-3.5 h-3.5 text-amber-700" />
-          Verbatim Moderator Intro & Consent
-        </h4>
-        <p className="text-xs text-amber-900 leading-relaxed italic bg-white/70 p-3 rounded-lg border border-amber-200/50">
-          &ldquo;{data.introScript}&rdquo;
-        </p>
-      </div>
-
-      {/* Questions by Theme */}
-      <div className="space-y-4">
-        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Thematic Question Guide ({data.sections?.length || 0} Themes)
-        </h4>
-
-        {data.sections?.map((sec, secIdx) => (
-          <div
-            key={secIdx}
-            className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3"
-          >
-            <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2">
-              <div>
-                <h5 className="text-sm font-bold text-slate-900">
-                  Theme {secIdx + 1}: {sec.theme}
-                </h5>
-                <p className="text-xs text-slate-500">{sec.purpose}</p>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-1">
-              {sec.questions?.map((q, qIdx) => (
-                <div
-                  key={qIdx}
-                  className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-2"
-                >
-                  <p className="text-xs font-bold text-slate-900">
-                    Q{secIdx + 1}.{qIdx + 1}: {q.question}
-                  </p>
-                  {q.probes && q.probes.length > 0 && (
-                    <div className="text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-200/60">
-                      <span className="font-semibold text-blue-700">
-                        Probes & Follow-ups:
-                      </span>
-                      <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-slate-600">
-                        {q.probes.map((probe, pIdx) => (
-                          <li key={pIdx}>{probe}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {q.expectedInsights && (
-                    <p className="text-[10px] text-slate-500 font-medium">
-                      💡 Insight target: {q.expectedInsights}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Wrap-up Script */}
-      <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
-        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Debrief & Wrap-up
-        </h4>
-        <p className="text-xs text-slate-700 italic bg-slate-50 p-3 rounded-lg border border-slate-100">
-          &ldquo;{data.wrapUpScript}&rdquo;
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RenderUsabilityScript({ data }: { data: UsabilityScriptData }) {
-  if (!data) return null;
-  return (
-    <div className="space-y-5">
-      {/* Test Objectives & Setup */}
-      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3">
-        <div>
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-            Usability Objectives
-          </h4>
-          <p className="text-sm font-semibold text-slate-800">{data.testObjectives}</p>
-          <span className="inline-block mt-1 text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-            {data.methodology}
-          </span>
-        </div>
-
-        <div className="pt-2 border-t border-slate-100">
-          <h5 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-            Setup & Test Materials
-          </h5>
-          <div className="flex flex-wrap gap-1.5">
-            {data.setupAndMaterials?.map((mat, i) => (
-              <span
-                key={i}
-                className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md"
-              >
-                • {mat}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Moderator Briefing */}
-      <div className="p-4 bg-purple-50/70 border border-purple-200/80 rounded-xl">
-        <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-          <FlaskConical className="w-3.5 h-3.5 text-purple-700" />
-          Think-Aloud Participant Briefing Script
-        </h4>
-        <p className="text-xs text-purple-900 leading-relaxed italic bg-white/70 p-3 rounded-lg border border-purple-200/50">
-          &ldquo;{data.moderatorBriefing}&rdquo;
-        </p>
-      </div>
-
-      {/* Task Scenarios */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Interactive Task Scenarios ({data.scenarios?.length || 0})
-        </h4>
-
-        {data.scenarios?.map((scen, idx) => (
-          <div
-            key={idx}
-            className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2.5"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">
-                Task {scen.scenarioNumber || idx + 1}: {scen.title}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded">
-              <span className="font-semibold text-slate-700">Context:</span>{" "}
-              {scen.context}
-            </p>
-
-            <div className="p-3 bg-purple-50/40 rounded-lg border border-purple-100 text-xs">
-              <span className="font-bold text-purple-900">Participant Prompt:</span>
-              <p className="mt-1 font-medium text-slate-900 italic">
-                &ldquo;{scen.taskPrompt}&rdquo;
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
-              <div className="p-2 bg-emerald-50/50 border border-emerald-100 rounded text-emerald-900">
-                <span className="font-bold block mb-0.5">Success Benchmark:</span>
-                {scen.successCriteria}
-              </div>
-              <div className="p-2 bg-slate-100/70 border border-slate-200 rounded text-slate-700">
-                <span className="font-bold block mb-0.5">Observer Notes:</span>
-                {scen.observerNotes}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Metrics */}
-      {data.postTaskMetrics && (
-        <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
-          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Standard Post-Test Usability Metrics (SEQ & SUS)
-          </h4>
-          <p className="text-xs text-slate-700 font-medium">
-            <strong>Single Ease Question (SEQ):</strong> {data.postTaskMetrics.seqQuestion}
-          </p>
-          <div className="text-xs text-slate-600 space-y-1 pt-1">
-            <strong>System Usability Scale (SUS) Items:</strong>
-            <ul className="list-disc list-inside space-y-0.5">
-              {data.postTaskMetrics.susScaleQuestions?.map((sq, i) => (
-                <li key={i}>{sq}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RenderUserPersona({ data }: { data: UserPersonaData }) {
-  if (!data) return null;
-  return (
-    <div className="space-y-5">
-      {/* Persona Hero Card */}
-      <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-        <div
-          className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"
-        />
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-md shrink-0"
-            style={{ backgroundColor: data.avatarColor || "#F59E0B" }}
-          >
-            {data.avatarInitials || "UP"}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-slate-900">{data.name}</h3>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                Target Persona
-              </span>
-            </div>
-            <p className="text-sm font-medium text-slate-600">{data.role}</p>
-            <p className="text-xs text-amber-700 font-medium italic mt-0.5">
-              &ldquo;{data.tagline}&rdquo;
-            </p>
-          </div>
-        </div>
-
-        {/* Demographics Pill Grid */}
-        {data.demographics && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-100 text-xs">
-            <div className="p-2 bg-slate-50 rounded-lg">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Age
-              </span>
-              <span className="font-semibold text-slate-800">
-                {data.demographics.ageRange}
-              </span>
-            </div>
-            <div className="p-2 bg-slate-50 rounded-lg">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Experience
-              </span>
-              <span className="font-semibold text-slate-800">
-                {data.demographics.experienceLevel}
-              </span>
-            </div>
-            <div className="p-2 bg-slate-50 rounded-lg">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Location
-              </span>
-              <span className="font-semibold text-slate-800">
-                {data.demographics.locationOrContext}
-              </span>
-            </div>
-            <div className="p-2 bg-slate-50 rounded-lg">
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                Tech Comfort
-              </span>
-              <span className="font-semibold text-slate-800">
-                {data.demographics.techComfort}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Quote Banner */}
-      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
-        <p className="text-sm font-semibold text-amber-950 italic">
-          &ldquo;{data.coreQuote}&rdquo;
-        </p>
-      </div>
-
-      {/* Bio */}
-      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs">
-        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-          Background & Context
-        </h4>
-        <p className="text-xs text-slate-700 leading-relaxed">{data.bio}</p>
-      </div>
-
-      {/* Goals vs Frustrations */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/80 space-y-2">
-          <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            Core Goals & Motivations
-          </h4>
-          <ul className="text-xs text-emerald-950 space-y-1.5">
-            {data.goals?.map((g, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <span className="text-emerald-600 font-bold">•</span>
-                <span>{g}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="p-4 bg-rose-50/50 rounded-xl border border-rose-200/80 space-y-2">
-          <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
-            Friction & Pain Points
-          </h4>
-          <ul className="text-xs text-rose-950 space-y-1.5">
-            {data.frustrations?.map((f, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <span className="text-rose-600 font-bold">•</span>
-                <span>{f}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Behaviors & Tools */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
-          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-            Daily Habits & Behaviors
-          </h4>
-          <ul className="text-xs text-slate-700 space-y-1">
-            {data.behaviors?.map((b, i) => (
-              <li key={i}>• {b}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
-          <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-            Tool Stack & Channels
-          </h4>
-          <div className="flex flex-wrap gap-1.5">
-            {data.toolsAndEnvironment?.map((tool, i) => (
-              <span
-                key={i}
-                className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-mono"
-              >
-                {tool}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function RenderUserFlow({ data }: { data: UserFlowData }) {
   if (!data) return null;
@@ -1850,152 +1415,6 @@ function RenderWireframe({
               <li key={i}>{note}</li>
             ))}
           </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RenderSurveyQuestions({ data }: { data: SurveyQuestionsData }) {
-  if (!data) return null;
-  return (
-    <div className="space-y-5">
-      {/* Objective & Meta */}
-      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2">
-        <h4 className="text-sm font-bold text-slate-900">{data.title}</h4>
-        <p className="text-xs text-slate-700">{data.objective}</p>
-        <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
-          <span>
-            <strong>Target:</strong> {data.targetRespondent}
-          </span>
-          <span>•</span>
-          <span>
-            <strong>Estimated duration:</strong> ~{data.estimatedMinutes || 5} min
-          </span>
-        </div>
-      </div>
-
-      {/* Intro Note */}
-      {data.introNote && (
-        <div className="p-3 bg-teal-50/70 border border-teal-200/80 rounded-xl text-xs text-teal-900 italic">
-          &ldquo;{data.introNote}&rdquo;
-        </div>
-      )}
-
-      {/* Questionnaire */}
-      <div className="space-y-3">
-        <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Survey Instrument ({data.questions?.length || 0} Questions)
-        </h5>
-
-        {data.questions?.map((q, idx) => (
-          <div
-            key={q.id || idx}
-            className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-xs font-bold text-slate-900">
-                {q.number || idx + 1}. {q.question}{" "}
-                {q.required && <span className="text-rose-500">*</span>}
-              </span>
-              <span className="text-[10px] font-mono uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded shrink-0">
-                {q.type}
-              </span>
-            </div>
-
-            {/* Answer Options by Question Type */}
-            {q.type === "single-choice" && q.options && (
-              <div className="space-y-1.5 text-xs text-slate-700">
-                {q.options.map((opt, oIdx) => (
-                  <label
-                    key={oIdx}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/60 cursor-pointer"
-                  >
-                    <input type="radio" name={`q-${q.id}`} className="text-teal-600" />
-                    <span>{opt}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {q.type === "multiple-choice" && q.options && (
-              <div className="space-y-1.5 text-xs text-slate-700">
-                {q.options.map((opt, oIdx) => (
-                  <label
-                    key={oIdx}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/60 cursor-pointer"
-                  >
-                    <input type="checkbox" className="text-teal-600 rounded" />
-                    <span>{opt}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {q.type === "likert-scale" && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span>{q.scaleMinLabel || "1 - Strongly Disagree"}</span>
-                  <span>{q.scaleMaxLabel || "5 - Strongly Agree"}</span>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((val) => (
-                    <button
-                      key={val}
-                      className="py-2 bg-slate-50 hover:bg-teal-50 hover:border-teal-300 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-colors"
-                    >
-                      {val}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {q.type === "nps" && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span>0 - Not at all likely</span>
-                  <span>10 - Extremely likely</span>
-                </div>
-                <div className="grid grid-cols-11 gap-1">
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
-                    <button
-                      key={score}
-                      className="py-1.5 bg-slate-50 hover:bg-teal-600 hover:text-white border border-slate-200 rounded text-[11px] font-bold text-slate-700 transition-colors"
-                    >
-                      {score}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {q.type === "open-text" && (
-              <textarea
-                disabled
-                rows={2}
-                placeholder="Participant types response here..."
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-400 italic resize-none"
-              />
-            )}
-
-            {q.purposeRationale && (
-              <div className="text-[10px] text-slate-400 bg-slate-50/50 p-1.5 rounded flex items-center justify-between">
-                <span>🎯 Measurement goal: {q.purposeRationale}</span>
-                {q.logicRule && (
-                  <span className="text-amber-600 font-mono">
-                    Branch: {q.logicRule}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {data.closingNote && (
-        <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-600 italic">
-          &ldquo;{data.closingNote}&rdquo;
         </div>
       )}
     </div>

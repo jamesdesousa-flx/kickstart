@@ -78,7 +78,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 // ============================================================================
-// Schemas for the 8 Artefact Types
+// Schemas for the 9 Artefact Types
 // ============================================================================
 
 export const interviewScriptSchema = {
@@ -420,6 +420,127 @@ export const affinityMapSchema = {
     },
   },
   required: ["title", "researchQuestion", "sources", "themes", "outliers", "keyTakeaways"],
+};
+
+export const researchReportSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    executiveSummary: { type: Type.STRING },
+    keyTakeaways: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    background: { type: Type.STRING },
+    researchQuestions: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    methodology: {
+      type: Type.OBJECT,
+      properties: {
+        methods: { type: Type.STRING },
+        participants: { type: Type.STRING },
+        timeframe: { type: Type.STRING },
+      },
+      required: ["methods", "participants", "timeframe"],
+    },
+    themes: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          insight: { type: Type.STRING },
+          findings: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                headline: { type: Type.STRING },
+                detail: { type: Type.STRING },
+                severity: {
+                  type: Type.STRING,
+                  enum: ["critical", "high", "medium", "low"],
+                },
+                frequency: { type: Type.STRING },
+                evidence: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      quote: { type: Type.STRING },
+                      source: { type: Type.STRING },
+                    },
+                    required: ["quote", "source"],
+                  },
+                },
+              },
+              required: ["id", "headline", "detail", "severity", "frequency", "evidence"],
+            },
+          },
+        },
+        required: ["name", "insight", "findings"],
+      },
+    },
+    whatWorked: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    recommendations: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          action: { type: Type.STRING },
+          rationale: { type: Type.STRING },
+          priority: {
+            type: Type.STRING,
+            enum: ["now", "next", "later"],
+          },
+          relatedFindings: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+        },
+        required: ["action", "rationale", "priority", "relatedFindings"],
+      },
+    },
+    limitations: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    nextSteps: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    participants: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING },
+          profile: { type: Type.STRING },
+        },
+        required: ["id", "profile"],
+      },
+    },
+  },
+  required: [
+    "title",
+    "executiveSummary",
+    "keyTakeaways",
+    "background",
+    "researchQuestions",
+    "methodology",
+    "themes",
+    "whatWorked",
+    "recommendations",
+    "limitations",
+    "nextSteps",
+    "participants",
+  ],
 };
 
 export const wireframeSchema = {
@@ -1085,6 +1206,113 @@ function synthesizeFallbackAffinityMap(title: string, summary: string): any {
   };
 }
 
+function synthesizeFallbackResearchReport(title: string, summary: string): any {
+  return {
+    title: title || "UX Research Report",
+    executiveSummary:
+      "Users want the tool to save them time, but setup feels risky and outputs do not travel between tools. Fix setup confidence first: it blocks every other benefit. Then make findings easy to share with their evidence attached.",
+    keyTakeaways: [
+      "Setup is the biggest barrier: users delay it because they cannot predict what will change.",
+      "Users rebuild the same content by hand across tools every week.",
+      "Stakeholders act on findings only when they can see the evidence.",
+    ],
+    background: `This study informs what the team builds next. Context: ${summary.slice(0, 160)}...`,
+    researchQuestions: [
+      "What stops new users from completing setup?",
+      "How do users move research outputs between tools today?",
+      "What makes stakeholders trust and act on findings?",
+    ],
+    methodology: {
+      methods: "Remote semi-structured interviews with a short task walkthrough.",
+      participants: "5 participants who run research or design work at least weekly.",
+      timeframe: "Not stated in the sources.",
+    },
+    themes: [
+      {
+        name: "Setup feels risky",
+        insight: "Users delay setup because they cannot predict what the tool will change.",
+        findings: [
+          {
+            id: "F1",
+            headline: "Most participants did not know what to do first on the empty canvas.",
+            detail: "Participants paused or left the page before adding a block. Without a starting point, the first session ends before users see any value.",
+            severity: "high",
+            frequency: "3 of 5 participants",
+            evidence: [
+              { quote: "I just stared at it for a minute, then closed the tab.", source: "P3" },
+            ],
+          },
+          {
+            id: "F2",
+            headline: "Participants feared that connecting data would overwrite team files.",
+            detail: "Users asked for a preview before any change is saved. Fear of breaking shared work stops them from connecting real data.",
+            severity: "critical",
+            frequency: "2 of 5 participants",
+            evidence: [
+              { quote: "If this touches the team drive, I need to know exactly what it does.", source: "P2" },
+            ],
+          },
+        ],
+      },
+      {
+        name: "Work is rebuilt by hand",
+        insight: "Users copy the same content between tools because outputs do not travel.",
+        findings: [
+          {
+            id: "F3",
+            headline: "Participants spend hours each week copying findings between tools.",
+            detail: "Findings move from notes to slides to the backlog by hand, and formatting is lost on every paste.",
+            severity: "medium",
+            frequency: "4 of 5 participants",
+            evidence: [
+              { quote: "Half my week is moving text from one place to another.", source: "P2" },
+            ],
+          },
+        ],
+      },
+    ],
+    whatWorked: [
+      "Participants valued generated drafts that used their own uploaded context.",
+      "Linking quotes to participants made findings more convincing to stakeholders.",
+    ],
+    recommendations: [
+      {
+        action: "Show a preview of every change before users connect a data source.",
+        rationale: "Removes the main reason users delay setup.",
+        priority: "now",
+        relatedFindings: ["F2"],
+      },
+      {
+        action: "Add a guided first step on the empty canvas.",
+        rationale: "Gives users a clear starting point so the first session shows value.",
+        priority: "now",
+        relatedFindings: ["F1"],
+      },
+      {
+        action: "Export findings to docs and slides with formatting and sources kept.",
+        rationale: "Stops users rebuilding the same content by hand.",
+        priority: "next",
+        relatedFindings: ["F3"],
+      },
+    ],
+    limitations: [
+      "Small qualitative sample: treat counts as direction, not as percentages of all users.",
+      "All participants were existing users, so first-time users may differ.",
+    ],
+    nextSteps: [
+      "Test a setup preview prototype with 5 new users.",
+      "Measure how many users finish setup before and after the change.",
+    ],
+    participants: [
+      { id: "P1", profile: "UX researcher, in-house team" },
+      { id: "P2", profile: "Research ops lead, agency" },
+      { id: "P3", profile: "Product designer, startup" },
+      { id: "P4", profile: "Product manager, enterprise" },
+      { id: "P5", profile: "Design lead, enterprise" },
+    ],
+  };
+}
+
 /** Device the user named in the title or guidance, e.g. "Focus on mobile" */
 function requestedScreenType(text: string): "mobile" | "tablet" | "web-desktop" | null {
   const t = text.toLowerCase();
@@ -1400,6 +1628,25 @@ export async function generateArtefact(params: {
       promptSpecifics = `Generate an Affinity Map titled "${nodeTitle || "Research Affinity Map"}". Extract notes from the research in the upstream context (transcripts, notes, survey results). Aim for 4 to 6 themes, each with 1 to 3 clusters. Set researchQuestion to the question the research answers. List every participant or source in "sources". Write 3 to 5 keyTakeaways as actionable statements for the product team.`;
       break;
 
+    case "research-report":
+      schema = researchReportSchema;
+      systemInstruction = `You are a Principal UX Researcher who writes research reports that busy stakeholders read and act on. You follow these rules:
+- Put conclusions first. The executive summary is 2 to 4 sentences: what we learned and what the team should do. Most readers stop there.
+- Stay true to the data. Use only what the sources support. Never invent participants, numbers, quotes or dates. If the sources do not state something, write "Not stated in the sources".
+- A finding is a full sentence that states what happened, for example "Most participants could not find the export option". Never use a topic label such as "Export".
+- Group findings into themes. The theme insight is one sentence that states what the theme means, not a topic.
+- Number findings F1, F2, F3 and so on across the whole report.
+- Report frequency as a count, for example "4 of 6 participants". Do not use percentages for small samples.
+- Give each finding at least one verbatim quote, without surrounding quotation marks, tagged with its source ID such as "P3". Use the IDs the sources already use.
+- Rate severity by impact on users and the business: "critical" (blocks the goal or causes loss), "high" (major friction or workaround), "medium" (slows users down), "low" (minor annoyance).
+- Order themes by importance and findings within a theme by severity, most severe first.
+- Every recommendation is an action the team can take, links to the finding IDs it addresses, and has a priority: "now", "next" or "later".
+- Include what worked well, so the team does not break it.
+- State limitations honestly, such as sample size, who was not included, and method bias.
+- Use plain language. No research jargon.`;
+      promptSpecifics = `Generate a UX Research Report titled "${nodeTitle || "UX Research Report"}". Summarise the research in the upstream context (transcripts, notes, survey results, affinity maps, previous assets) into a findings doc. Write 3 to 5 keyTakeaways. Aim for 3 to 5 themes with 1 to 3 findings each. Write 3 to 6 recommendations. List every participant or source in "participants" with a short profile.`;
+      break;
+
     case "wireframe": {
       schema = wireframeSchema;
       const device = requestedScreenType(`${nodeTitle} ${customGuidance}`);
@@ -1491,6 +1738,8 @@ Produce an exhaustive, highly practical, and context-tailored JSON output adheri
       return synthesizeFallbackUserJourneyMap(nodeTitle, summary);
     case "affinity-map":
       return synthesizeFallbackAffinityMap(nodeTitle, summary);
+    case "research-report":
+      return synthesizeFallbackResearchReport(nodeTitle, summary);
     case "wireframe":
       return {
         ...synthesizeFallbackWireframe(nodeTitle, summary),

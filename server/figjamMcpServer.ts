@@ -1269,6 +1269,8 @@ const placed = [];
 const made = [];
 let section;
 let connectorCount = 0;
+const grouped = new Set();
+const groupSections = [];
 
 try {
 for (const sc of spec.screens) {
@@ -1362,8 +1364,6 @@ for (const s of spec.stickies) {
 }
 
 // Wrap each group (e.g. an affinity theme) in its own section, after stacking so it fits the real heights
-const grouped = new Set();
-const groupSections = [];
 for (const g of spec.groups) {
   const members = g.memberIds.map((id) => byId[id]).filter(Boolean);
   if (members.length === 0) continue;
@@ -1374,6 +1374,7 @@ for (const g of spec.groups) {
   const gs = figma.createSection();
   made.push(gs);
   gs.name = g.title;
+  try { gs.fills = [{ type: "SOLID", color: hex("#FFFFFF") }]; } catch (e) {}
   gs.x = gx - 48;
   gs.y = gy - 96;
   gs.resizeWithoutConstraints(gw + 96, gh + 144);
@@ -1422,6 +1423,10 @@ const maxY = Math.max(...placed.map((n) => n.y + n.height));
 section = figma.createSection();
 made.push(section);
 section.name = spec.sectionTitle;
+// Affinity maps (the only artefact with groups) use an all-white board
+if (groupSections.length) {
+  try { section.fills = [{ type: "SOLID", color: hex("#FFFFFF") }]; } catch (e) {}
+}
 section.x = minX - 80;
 section.y = minY - 120;
 section.resizeWithoutConstraints(maxX - minX + 160, maxY - minY + 200);

@@ -14,6 +14,7 @@ import {
   GitFork,
   Compass,
   StickyNote,
+  NotebookText,
   Layout,
   ListChecks,
   GripVertical,
@@ -67,6 +68,8 @@ export const ArtefactLibraryPanel: React.FC<ArtefactLibraryPanelProps> = ({
         return <Compass className="w-4 h-4 text-slate-700" />;
       case "affinity-map":
         return <StickyNote className="w-4 h-4 text-slate-700" />;
+      case "research-report":
+        return <NotebookText className="w-4 h-4 text-slate-700" />;
       case "wireframe":
         return <Layout className="w-4 h-4 text-slate-700" />;
       case "survey-questions":
@@ -110,7 +113,7 @@ export const ArtefactLibraryPanel: React.FC<ArtefactLibraryPanelProps> = ({
   }
 
   return (
-    <aside className="fixed left-3 top-16 bottom-3 z-30 w-76 bg-white border border-slate-200 rounded-xl shadow-lg flex flex-col overflow-hidden transition-all">
+    <aside id="artefact-library-panel" className="fixed left-3 top-16 bottom-3 z-30 w-76 bg-white border border-slate-200 rounded-xl shadow-lg flex flex-col overflow-hidden transition-all">
       {/* Header */}
       <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
         <div className="flex items-center gap-2">

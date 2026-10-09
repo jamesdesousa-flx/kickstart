@@ -177,6 +177,9 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // Set by CanvasWorkspace: returns a position centred in the visible canvas
+  const viewportCenterRef = useRef<((type: ArtefactType) => { x: number; y: number }) | null>(null);
+
   // Add artefact from library
   const handleAddArtefact = useCallback(
     (type: ArtefactType, position?: { x: number; y: number }) => {
@@ -408,6 +411,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         googleDocId: docResult.documentId,
         googleDocUrl: docResult.documentUrl,
         googleDocCreatedAt: new Date().toISOString(),
+        error: null,
       });
 
       showNotification(`Created Google Doc for ${targetNode.title}!`);
@@ -562,6 +566,22 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       }
     }
 
+    // For text artefacts, nothing should be generated outside of Google Docs!
+    // Sign in before generating so the result always lands in a Doc.
+    let googleToken: string | null = null;
+    if (isTextBasedArtefact(targetNode.type)) {
+      googleToken =
+        googleAccessToken || (await getAccessToken()) || (await handleGoogleSignIn());
+      if (!googleToken) {
+        const message =
+          "Sign in with Google to generate this asset. Text assets are created as Google Docs.";
+        showNotification(message);
+        handleUpdateNode(nodeId, { isGenerating: false, error: message });
+        setActiveDetailNodeId(nodeId);
+        return;
+      }
+    }
+
     // Set generating state ONLY on this specific node
     handleUpdateNode(nodeId, {
       isGenerating: true,
@@ -590,29 +610,27 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
       let googleDocUrl = targetNode.googleDocUrl;
       let googleDocCreatedAt = targetNode.googleDocCreatedAt;
 
-      // For all text-based artefacts, generate a Google Doc automatically
-      if (isTextBasedArtefact(targetNode.type)) {
-        let token = googleAccessToken;
-        if (!token) {
-          token = await getAccessToken();
-        }
-
-        // If authenticated with Google, create the document directly in user's Drive
-        if (token) {
-          try {
-            showNotification(`Creating Google Doc for ${targetNode.title}...`);
-            const docResult = await createGoogleDocForArtefact({
-              title: targetNode.title,
-              type: targetNode.type,
-              data: result.data,
-              accessToken: token,
-            });
-            googleDocId = docResult.documentId;
-            googleDocUrl = docResult.documentUrl;
-            googleDocCreatedAt = new Date().toISOString();
-          } catch (docErr: any) {
-            console.warn("Failed to create Google Doc automatically:", docErr);
-          }
+      // For all text-based artefacts, the Google Doc is the only output
+      let googleDocError: string | null = null;
+      if (googleToken) {
+        try {
+          showNotification(`Creating Google Doc for ${targetNode.title}...`);
+          const docResult = await createGoogleDocForArtefact({
+            title: targetNode.title,
+            type: targetNode.type,
+            data: result.data,
+            accessToken: googleToken,
+          });
+          googleDocId = docResult.documentId;
+          googleDocUrl = docResult.documentUrl;
+          googleDocCreatedAt = new Date().toISOString();
+        } catch (docErr: any) {
+          console.error("Failed to create Google Doc:", docErr);
+          googleDocError = `Google Doc creation failed: ${docErr?.message || "Check permissions"}`;
+          // The old Doc no longer matches the new content, so don't keep showing it
+          googleDocId = undefined;
+          googleDocUrl = undefined;
+          googleDocCreatedAt = undefined;
         }
       }
 
@@ -656,7 +674,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         generatedAt: result.generatedAt || new Date().toISOString(),
         isGenerating: false,
         customGuidance,
-        error: figjamError,
+        error: figjamError || googleDocError,
         googleDocId,
         googleDocUrl,
         googleDocCreatedAt,
@@ -669,6 +687,9 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
 
       if (figjamError) {
         showNotification(`${projectFigmaProduct} error: ${figjamError}`);
+        setActiveDetailNodeId(nodeId);
+      } else if (googleDocError) {
+        showNotification(googleDocError);
         setActiveDetailNodeId(nodeId);
       } else if (isVisualFigjamArtefact(targetNode.type)) {
         // Success message was already shown with the FigJam draw summary
@@ -846,6 +867,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
           onOpenDetailView={(nodeId) => setActiveDetailNodeId(nodeId)}
           onGenerateArtefact={(nodeId) => handleGenerateArtefact(nodeId, "")}
           onDropArtefact={handleAddArtefact}
+          viewportCenterRef={viewportCenterRef}
           onOpenLibrary={() => setIsLibraryOpen(true)}
           isLibraryOpen={isLibraryOpen}
           googleAccessToken={googleAccessToken}
@@ -856,7 +878,7 @@ export function ProjectWorkspace({ project, initialCanvas, onBack }: ProjectWork
         <ArtefactLibraryPanel
           isOpen={isLibraryOpen}
           onToggleOpen={() => setIsLibraryOpen(!isLibraryOpen)}
-          onAddArtefact={(type) => handleAddArtefact(type)}
+          onAddArtefact={(type) => handleAddArtefact(type, viewportCenterRef.current?.(type))}
           onClearCanvas={handleClearCanvas}
           hasNodes={nodes.length > 0}
         />

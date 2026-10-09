@@ -9,6 +9,7 @@ import {
   UsabilityScriptData,
   SurveyQuestionsData,
   UserPersonaData,
+  ResearchReportData,
 } from "../types/artefacts";
 
 /**
@@ -19,7 +20,8 @@ export function isTextBasedArtefact(type: ArtefactType): boolean {
     type === "interview-script" ||
     type === "usability-script" ||
     type === "survey-questions" ||
-    type === "user-persona"
+    type === "user-persona" ||
+    type === "research-report"
   );
 }
 
@@ -266,6 +268,207 @@ export function formatArtefactForGoogleDoc(
   return `${title}\nGenerated ${dateStr}\n\n${JSON.stringify(data, null, 2)}`;
 }
 
+/* ==========================================================================
+   Styled Google Doc content
+   ========================================================================== */
+type DocParagraphStyle = "TITLE" | "SUBTITLE" | "HEADING_1" | "HEADING_2" | "HEADING_3" | "NORMAL_TEXT";
+type DocListKind = "bullet" | "numbered";
+
+const LIST_PRESETS: Record<DocListKind, string> = {
+  bullet: "BULLET_DISC_CIRCLE_SQUARE",
+  numbered: "NUMBERED_DECIMAL_ALPHA_ROMAN",
+};
+
+/**
+ * Builds document text plus the batchUpdate requests that style it.
+ * Google Docs indexes count UTF-16 code units from 1, the same as JS string length.
+ */
+class GoogleDocBuilder {
+  text = "";
+  styleRequests: any[] = [];
+  private listRun: { kind: DocListKind; start: number; end: number } | null = null;
+
+  paragraph(
+    text: string,
+    options: { style?: DocParagraphStyle; list?: DocListKind; boldPrefix?: string; italic?: boolean } = {}
+  ) {
+    const line = text.replace(/\n+/g, " ").trim();
+    const start = 1 + this.text.length;
+    this.text += `${line}\n`;
+    const end = 1 + this.text.length;
+
+    if (options.style && options.style !== "NORMAL_TEXT") {
+      this.styleRequests.push({
+        updateParagraphStyle: {
+          range: { startIndex: start, endIndex: end },
+          paragraphStyle: { namedStyleType: options.style },
+          fields: "namedStyleType",
+        },
+      });
+    }
+    if (options.boldPrefix && line.startsWith(options.boldPrefix)) {
+      this.styleRequests.push({
+        updateTextStyle: {
+          range: { startIndex: start, endIndex: start + options.boldPrefix.length },
+          textStyle: { bold: true },
+          fields: "bold",
+        },
+      });
+    }
+    if (options.italic && line.length > 0) {
+      this.styleRequests.push({
+        updateTextStyle: {
+          range: { startIndex: start, endIndex: end - 1 },
+          textStyle: { italic: true },
+          fields: "italic",
+        },
+      });
+    }
+
+    // Consecutive list items share one list, so numbering does not restart
+    if (options.list && this.listRun?.kind === options.list && this.listRun.end === start) {
+      this.listRun.end = end;
+    } else {
+      this.flushList();
+      if (options.list) this.listRun = { kind: options.list, start, end };
+    }
+    return this;
+  }
+
+  list(items: string[] | undefined, kind: DocListKind = "bullet") {
+    (items || []).filter((item) => item?.trim()).forEach((item) => this.paragraph(item, { list: kind }));
+    return this;
+  }
+
+  heading(text: string, level: 1 | 2 | 3) {
+    return this.paragraph(text, { style: `HEADING_${level}` as DocParagraphStyle });
+  }
+
+  build() {
+    this.flushList();
+    return { text: this.text, styleRequests: this.styleRequests };
+  }
+
+  private flushList() {
+    if (!this.listRun) return;
+    this.styleRequests.push({
+      createParagraphBullets: {
+        range: { startIndex: this.listRun.start, endIndex: this.listRun.end },
+        bulletPreset: LIST_PRESETS[this.listRun.kind],
+      },
+    });
+    this.listRun = null;
+  }
+}
+
+const SEVERITY_LABELS: Record<string, string> = {
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  now: "Now",
+  next: "Next",
+  later: "Later",
+};
+
+/**
+ * Lays out a research report as a findings doc: conclusions first, then evidence, then detail
+ */
+function buildResearchReportDoc(title: string, r: ResearchReportData, dateStr: string) {
+  const doc = new GoogleDocBuilder();
+  doc.paragraph(r.title || title, { style: "TITLE" });
+  doc.paragraph(`UX Research Findings • ${dateStr}`, { style: "SUBTITLE" });
+
+  doc.heading("Executive summary", 1);
+  doc.paragraph(r.executiveSummary);
+  if (r.keyTakeaways?.length) {
+    doc.heading("Key takeaways", 3);
+    doc.list(r.keyTakeaways);
+  }
+
+  doc.heading("Research goals", 1);
+  if (r.background) doc.paragraph(r.background);
+  if (r.researchQuestions?.length) {
+    doc.heading("Research questions", 3);
+    doc.list(r.researchQuestions, "numbered");
+  }
+
+  doc.heading("Method and participants", 1);
+  doc.paragraph(`Method: ${r.methodology?.methods || "Not stated"}`, { boldPrefix: "Method:" });
+  doc.paragraph(`Participants: ${r.methodology?.participants || "Not stated"}`, { boldPrefix: "Participants:" });
+  doc.paragraph(`Timeframe: ${r.methodology?.timeframe || "Not stated"}`, { boldPrefix: "Timeframe:" });
+
+  doc.heading("Findings", 1);
+  (r.themes || []).forEach((theme) => {
+    doc.heading(theme.name, 2);
+    if (theme.insight) doc.paragraph(theme.insight, { italic: true });
+    (theme.findings || []).forEach((f) => {
+      doc.heading(f.id ? `${f.id}. ${f.headline}` : f.headline, 3);
+      const severity = SEVERITY_LABELS[f.severity] || f.severity;
+      doc.paragraph(`Severity: ${severity} • Seen in: ${f.frequency}`, { boldPrefix: "Severity:" });
+      if (f.detail) doc.paragraph(f.detail);
+      doc.list(
+        (f.evidence || []).map((e) => `“${e.quote.replace(/^["“]|["”]$/g, "")}” (${e.source})`)
+      );
+    });
+  });
+
+  if (r.whatWorked?.length) {
+    doc.heading("What worked well", 1);
+    doc.list(r.whatWorked);
+  }
+
+  if (r.recommendations?.length) {
+    doc.heading("Recommendations", 1);
+    r.recommendations.forEach((rec, i) => {
+      doc.heading(`R${i + 1}. ${rec.action}`, 3);
+      const priority = PRIORITY_LABELS[rec.priority] || rec.priority;
+      const related = rec.relatedFindings?.length ? ` • Addresses: ${rec.relatedFindings.join(", ")}` : "";
+      doc.paragraph(`Priority: ${priority}${related}`, { boldPrefix: "Priority:" });
+      if (rec.rationale) doc.paragraph(rec.rationale);
+    });
+  }
+
+  if (r.limitations?.length) {
+    doc.heading("Limitations", 1);
+    doc.list(r.limitations);
+  }
+
+  if (r.nextSteps?.length) {
+    doc.heading("Next steps and open questions", 1);
+    doc.list(r.nextSteps);
+  }
+
+  if (r.participants?.length) {
+    doc.heading("Appendix: participants", 1);
+    doc.list(r.participants.map((p) => `${p.id}: ${p.profile}`));
+  }
+
+  return doc.build();
+}
+
+/**
+ * Returns the doc text and any batchUpdate requests that style it (headings, lists, emphasis)
+ */
+export function buildGoogleDocContent(
+  title: string,
+  type: ArtefactType,
+  data: any
+): { text: string; styleRequests: any[] } {
+  if (data && type === "research-report") {
+    const dateStr = new Date().toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    return buildResearchReportDoc(title, data as ResearchReportData, dateStr);
+  }
+  return { text: formatArtefactForGoogleDoc(title, type, data), styleRequests: [] };
+}
+
 export interface GoogleDocCreationResult {
   documentId: string;
   documentUrl: string;
@@ -284,7 +487,7 @@ export async function createGoogleDocForArtefact(params: {
   const { title, type, data, accessToken } = params;
 
   const docTitle = `${title} (${new Date().toISOString().slice(0, 10)})`;
-  const formattedText = formatArtefactForGoogleDoc(title, type, data);
+  const { text: formattedText, styleRequests } = buildGoogleDocContent(title, type, data);
 
   // 1. Create the blank document in user's Drive
   const createResponse = await fetch("https://docs.googleapis.com/v1/documents", {
@@ -333,6 +536,22 @@ export async function createGoogleDocForArtefact(params: {
 
   if (!updateResponse.ok) {
     console.warn("Failed to populate doc content via batchUpdate:", await updateResponse.text());
+  } else if (styleRequests.length > 0) {
+    // Styled separately so the text is kept even if styling fails
+    const styleResponse = await fetch(
+      `https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requests: styleRequests }),
+      }
+    );
+    if (!styleResponse.ok) {
+      console.warn("Failed to style doc content via batchUpdate:", await styleResponse.text());
+    }
   }
 
   // 3. Make document accessible with link if possible for smooth iframe preview

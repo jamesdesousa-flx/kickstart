@@ -24,6 +24,7 @@ import {
   GitFork,
   Compass,
   StickyNote,
+  NotebookText,
   Layout,
   ListChecks,
   Layers,
@@ -52,6 +53,8 @@ interface CanvasWorkspaceProps {
   onOpenDetailView: (nodeId: string) => void;
   onGenerateArtefact?: (nodeId: string) => void;
   onDropArtefact: (type: ArtefactType, position: { x: number; y: number }) => void;
+  /** Populated with a function returning the top-left position that centres a new node in the visible canvas */
+  viewportCenterRef?: React.MutableRefObject<((type: ArtefactType) => { x: number; y: number }) | null>;
   onOpenLibrary: () => void;
   isLibraryOpen: boolean;
   googleAccessToken?: string | null;
@@ -81,6 +84,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onOpenDetailView,
   onGenerateArtefact,
   onDropArtefact,
+  viewportCenterRef,
   googleAccessToken,
   onGoogleSignIn,
 }) => {
@@ -154,6 +158,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     },
     [pan, zoom]
   );
+
+  // Expose the centre of the visible canvas (excluding the overlaid library panel)
+  useEffect(() => {
+    if (!viewportCenterRef) return;
+    viewportCenterRef.current = (type) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return { x: 0, y: 0 };
+      const panelRect = document.getElementById("artefact-library-panel")?.getBoundingClientRect();
+      const left = panelRect ? Math.max(rect.left, panelRect.right) : rect.left;
+      const center = screenToCanvas((left + rect.right) / 2, (rect.top + rect.bottom) / 2);
+      const width = getNodeWidth({ type } as CanvasNode);
+      return {
+        x: Math.round(center.x - width / 2),
+        y: Math.round(center.y - 80),
+      };
+    };
+    return () => {
+      viewportCenterRef.current = null;
+    };
+  }, [viewportCenterRef, screenToCanvas]);
 
   // Canvas Mouse Down (Panning)
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -251,12 +275,21 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
   };
 
-  // Node header mousedown (start dragging node)
+  // Node mousedown (start dragging node), ignoring interactive controls
   const handleNodeDragStart = (
     e: React.MouseEvent,
     nodeId: string,
     currentPos: { x: number; y: number }
   ) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        'input, textarea, select, button, a, label, [contenteditable="true"], [role="button"]'
+      )
+    ) {
+      return;
+    }
     e.stopPropagation();
     const canvasPos = screenToCanvas(e.clientX, e.clientY);
     setDraggingNodeId(nodeId);
@@ -390,17 +423,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       </div>
 
       <CanvasToolbar activeTool={activeTool} onSelectTool={setActiveTool} />
-
-      {/* Empty Canvas Indicator */}
-      {nodes.length === 0 && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-6 text-center">
-          <div className="p-4 bg-white/90 border border-slate-200 rounded-xl shadow-xs pointer-events-auto max-w-sm">
-            <p className="text-xs text-slate-600 font-medium">
-              Canvas is blank. Drag artefacts from the library on the left.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Canvas Layer */}
       <div
@@ -552,7 +574,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               top: `${node.position.y}px`,
               width: `${getNodeWidth(node)}px`,
             }}
-            className="pointer-events-auto"
+            onMouseDown={(e) => handleNodeDragStart(e, node.id, node.position)}
+            className="pointer-events-auto cursor-grab active:cursor-grabbing"
           >
             {node.type === "sticky-note" ? (
               <StickyNoteCard
@@ -1146,6 +1169,8 @@ const GenerativeArtefactCard: React.FC<GenerativeArtefactCardProps> = ({
         return <Compass className="w-3.5 h-3.5 text-slate-700" />;
       case "affinity-map":
         return <StickyNote className="w-3.5 h-3.5 text-slate-700" />;
+      case "research-report":
+        return <NotebookText className="w-3.5 h-3.5 text-slate-700" />;
       case "wireframe":
         return <Layout className="w-3.5 h-3.5 text-slate-700" />;
       case "survey-questions":
